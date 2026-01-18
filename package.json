@@ -1,9 +1,8 @@
 {
-  "name": "base-archery-game",
+  "name": "base-archery-miniapp",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
     "build": "next build",
     "start": "next start"
   },

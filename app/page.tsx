@@ -1,14 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import GameCanvas from "@/components/GameCanvas";
-import { useEffect, useState } from "react";
 
 export default function Home() {
   const [account, setAccount] = useState<string | null>(null);
 
   async function connectWallet() {
     if (!window.ethereum) {
-      alert("Install wallet");
+      alert("Wallet not found");
       return;
     }
 
@@ -21,7 +21,7 @@ export default function Home() {
 
   return (
     <main style={{ textAlign: "center", padding: 20 }}>
-      <h1>🎯 Base Archery Game</h1>
+      <h1>🎯 Base Archery</h1>
 
       {!account && (
         <button onClick={connectWallet}>

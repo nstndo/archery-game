@@ -9,13 +9,15 @@ export default function GameCanvas() {
     const ctx = canvas.getContext("2d")!;
     let rotation = 0;
 
-    const draw = () => {
+    function draw() {
       ctx.clearRect(0, 0, 300, 300);
 
+      // Circle
       ctx.beginPath();
       ctx.arc(150, 150, 100, 0, Math.PI * 2);
       ctx.stroke();
 
+      // Arrows
       arrows.forEach(a => {
         ctx.save();
         ctx.translate(150, 150);
@@ -27,9 +29,9 @@ export default function GameCanvas() {
         ctx.restore();
       });
 
-      rotation += 0.01;
+      rotation += 0.02;
       requestAnimationFrame(draw);
-    };
+    }
 
     draw();
 

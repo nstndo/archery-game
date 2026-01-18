@@ -1,8 +1,6 @@
-import "./globals.css";
-
 export const metadata = {
-  title: "Base Archery Game",
-  description: "Shoot arrows, mint your score",
+  title: "Base Archery",
+  description: "Mini App on Base"
 };
 
 export default function RootLayout({
@@ -15,4 +13,4 @@ export default function RootLayout({
       <body>{children}</body>
     </html>
   );
-} 
+}
