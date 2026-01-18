@@ -1,126 +1,125 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-
-const COLOR_PRIMARY = "#0052FF";
-const COLOR_DARK = "#050505";
-
-const TARGET_RADIUS = 65;
-const ARROW_LENGTH = 100;
-const ARROW_WIDTH = 3;
-
-type Pin = {
-  angle: number;
-};
-
-type ActivePin = {
-  y: number;
-  isMoving: boolean;
-};
+import { useEffect, useRef } from "react";
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const [level, setLevel] = useState(1);
-  const [arrowsLeft, setArrowsLeft] = useState(6);
-  const [gameOver, setGameOver] = useState(false);
-
-  const pins = useRef<Pin[]>([]);
-  const activePin = useRef<ActivePin | null>(null);
-
-  const rotationAngle = useRef(0);
-  const currentRotationSpeed = useRef(0.03);
-  const targetRotationSpeed = useRef(0.03);
-  const rotationChangeTimer = useRef(100);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
 
+    let width, height;
+
+    const TARGET_RADIUS = 65;
+    const ARROW_LENGTH = 100;
+    const ARROW_WIDTH = 3;
+
+    const COLOR_PRIMARY = "#0052FF";
+    const COLOR_DARK = "#050505";
+
+    let gameState = "playing";
+    let level = 1;
+    let rotationAngle = 0;
+
+    let currentRotationSpeed = 0.04;
+    let targetRotationSpeed = 0.04;
+    let rotationChangeTimer = 0;
+
+    let pins: { angle: number }[] = [];
+    let activePin: { y: number; isMoving: boolean } | null = null;
+    let pinsLeftToShoot = 0;
+
     function resize() {
-      canvas.width = canvas.parentElement!.clientWidth;
-      canvas.height = canvas.parentElement!.clientHeight;
+      width = canvas.parentElement!.clientWidth;
+      height = canvas.parentElement!.clientHeight;
+      canvas.width = width;
+      canvas.height = height;
     }
 
-    resize();
     window.addEventListener("resize", resize);
+    resize();
 
     function setupLevel(lvl: number) {
-      setLevel(lvl);
-      pins.current = [];
-      rotationAngle.current = 0;
-      currentRotationSpeed.current = 0.03;
-      targetRotationSpeed.current = 0.03;
-      rotationChangeTimer.current = 80;
+      level = lvl;
+      pins = [];
+      rotationAngle = 0;
 
-      const pinCount = 6 + Math.ceil(lvl / 2);
-      setArrowsLeft(pinCount);
+      currentRotationSpeed = 0.03;
+      targetRotationSpeed = 0.03;
+
+      let pinsCount = 6 + Math.ceil(level / 2);
+      pinsLeftToShoot = pinsCount;
 
       prepareNextPin();
-      setGameOver(false);
+      gameState = "playing";
     }
 
     function prepareNextPin() {
-      activePin.current = {
-        y: canvas.height - 120,
+      activePin = {
+        y: height - 120,
         isMoving: false,
       };
     }
 
     function updateRotation() {
-      rotationChangeTimer.current--;
-
-      if (rotationChangeTimer.current <= 0) {
-        rotationChangeTimer.current = 60 + Math.random() * 100;
+      rotationChangeTimer--;
+      if (rotationChangeTimer <= 0) {
+        rotationChangeTimer = 60 + Math.random() * 100;
 
         const maxSpeed = 0.04 + level * 0.005;
         const direction = Math.random() > 0.5 ? 1 : -1;
 
         if (Math.random() < 0.15) {
-          targetRotationSpeed.current = 0.01 * direction;
+          targetRotationSpeed = 0.01 * direction;
         } else {
-          targetRotationSpeed.current =
+          targetRotationSpeed =
             (0.02 + Math.random() * maxSpeed) * direction;
         }
       }
 
-      currentRotationSpeed.current +=
-        (targetRotationSpeed.current - currentRotationSpeed.current) * 0.02;
+      currentRotationSpeed +=
+        (targetRotationSpeed - currentRotationSpeed) * 0.02;
 
-      rotationAngle.current += currentRotationSpeed.current;
-    }
-
-    function checkCollision(hitAngle: number) {
-      const safeZone = 0.15;
-
-      return pins.current.some(p => {
-        let diff = Math.abs(p.angle - hitAngle);
-        if (diff > Math.PI) diff = Math.PI * 2 - diff;
-        return diff < safeZone;
-      });
+      rotationAngle += currentRotationSpeed;
     }
 
     function update() {
-      updateRotation();
+      if (gameState === "playing") {
+        updateRotation();
+      }
 
-      if (activePin.current && activePin.current.isMoving) {
-        activePin.current.y -= 45;
+      if (gameState === "playing" && activePin && activePin.isMoving) {
+        const speed = 45;
+        activePin.y -= speed;
 
-        const hitY = canvas.height / 2 + TARGET_RADIUS;
-
-        if (activePin.current.y <= hitY) {
-          let hitAngle = Math.PI / 2 - rotationAngle.current;
+        if (activePin.y <= height / 2 + TARGET_RADIUS) {
+          let hitAngle = Math.PI / 2 - rotationAngle;
           hitAngle = hitAngle % (Math.PI * 2);
           if (hitAngle < 0) hitAngle += Math.PI * 2;
 
-          if (checkCollision(hitAngle)) {
-            setGameOver(true);
-          } else {
-            pins.current.push({ angle: hitAngle });
-            setArrowsLeft(a => a - 1);
+          let collision = false;
+          const safeZone = 0.15;
 
-            if (arrowsLeft - 1 <= 0) {
-              setTimeout(() => setupLevel(level + 1), 500);
+          for (let p of pins) {
+            let diff = Math.abs(p.angle - hitAngle);
+            if (diff > Math.PI) diff = Math.PI * 2 - diff;
+            if (diff < safeZone) {
+              collision = true;
+              break;
+            }
+          }
+
+          if (collision) {
+            gameState = "failed";
+          } else {
+            pins.push({ angle: hitAngle });
+            pinsLeftToShoot--;
+
+            if (pinsLeftToShoot <= 0) {
+              setTimeout(() => {
+                setupLevel(level + 1);
+              }, 500);
             } else {
               prepareNextPin();
             }
@@ -163,16 +162,16 @@ export default function GameCanvas() {
     }
 
     function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, width, height);
 
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
+      const centerX = width / 2;
+      const centerY = height / 2;
 
       ctx.save();
       ctx.translate(centerX, centerY);
-      ctx.rotate(rotationAngle.current);
+      ctx.rotate(rotationAngle);
 
-      pins.current.forEach(p => {
+      pins.forEach(p => {
         drawArrow(0, 0, p.angle, COLOR_DARK);
       });
 
@@ -185,12 +184,12 @@ export default function GameCanvas() {
       ctx.font = "bold 32px Arial";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(String(arrowsLeft), 0, 2);
+      ctx.fillText(String(pinsLeftToShoot), 0, 2);
 
       ctx.restore();
 
-      if (activePin.current && !gameOver) {
-        drawArrow(centerX, activePin.current.y, undefined, COLOR_PRIMARY);
+      if (activePin && gameState === "playing") {
+        drawArrow(centerX, activePin.y, undefined, COLOR_PRIMARY);
       }
     }
 
@@ -201,9 +200,9 @@ export default function GameCanvas() {
     }
 
     function shoot() {
-      if (gameOver) return;
-      if (!activePin.current || activePin.current.isMoving) return;
-      activePin.current.isMoving = true;
+      if (gameState !== "playing") return;
+      if (!activePin || activePin.isMoving) return;
+      activePin.isMoving = true;
     }
 
     canvas.addEventListener("mousedown", shoot);
@@ -215,11 +214,14 @@ export default function GameCanvas() {
     return () => {
       window.removeEventListener("resize", resize);
     };
-  }, [level, arrowsLeft, gameOver]);
+  }, []);
 
   return (
     <div style={{ height: "100vh", background: "#000020" }}>
-      <canvas ref={canvasRef} style={{ width: "100%", height: "100%" }} />
+      <canvas
+        ref={canvasRef}
+        style={{ width: "100%", height: "100%" }}
+      />
     </div>
   );
 }
