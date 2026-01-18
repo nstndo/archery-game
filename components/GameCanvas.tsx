@@ -4,6 +4,11 @@ import { useEffect, useRef, useState } from "react";
 
 const BASE_BLUE = "#0000ff";
 
+type FlyingArrow = {
+  angle: number;
+  progress: number; // 0 → 1
+};
+
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -11,10 +16,12 @@ export default function GameCanvas() {
   const [arrowsLeft, setArrowsLeft] = useState(5);
   const [gameOver, setGameOver] = useState(false);
 
-  const arrows: number[] = [];
+  const stuckArrows: number[] = [];
+  const flyingArrows: FlyingArrow[] = [];
 
   let rotation = 0;
-  let speed = (Math.random() * 0.03 + 0.015) * (Math.random() > 0.5 ? 1 : -1);
+  let speed =
+    (Math.random() * 0.04 + 0.02) * (Math.random() > 0.5 ? 1 : -1);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -25,6 +32,21 @@ export default function GameCanvas() {
     const targetImg = new Image();
     targetImg.src = "/base-logo.png";
 
+    let lastDirectionChange = Date.now();
+
+    function maybeChangeDirection() {
+      if (Date.now() - lastDirectionChange > 1500) {
+        if (Math.random() < 0.4) {
+          speed *= -1;
+        } else {
+          speed =
+            (Math.random() * 0.05 + 0.015) *
+            (Math.random() > 0.5 ? 1 : -1);
+        }
+        lastDirectionChange = Date.now();
+      }
+    }
+
     function drawTarget() {
       ctx.save();
       ctx.translate(center.x, center.y);
@@ -33,8 +55,8 @@ export default function GameCanvas() {
       ctx.restore();
     }
 
-    function drawArrows() {
-      arrows.forEach(angle => {
+    function drawStuckArrows() {
+      stuckArrows.forEach(angle => {
         ctx.save();
         ctx.translate(center.x, center.y);
         ctx.rotate(angle);
@@ -48,8 +70,24 @@ export default function GameCanvas() {
       });
     }
 
+    function drawFlyingArrows() {
+      flyingArrows.forEach(a => {
+        const dist = a.progress * radius;
+        ctx.save();
+        ctx.translate(center.x, center.y);
+        ctx.rotate(a.angle);
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(0, -dist);
+        ctx.lineTo(0, -dist - 32);
+        ctx.stroke();
+        ctx.restore();
+      });
+    }
+
     function checkCollision(newAngle: number) {
-      return arrows.some(a => Math.abs(a - newAngle) < 0.25);
+      return stuckArrows.some(a => Math.abs(a - newAngle) < 0.25);
     }
 
     function drawUI() {
@@ -58,21 +96,58 @@ export default function GameCanvas() {
       ctx.fillText(`Level ${level}`, 20, 40);
       ctx.fillText(`Arrows: ${arrowsLeft}`, 20, 70);
 
-      // Progress bar
       const total = 5 + (level - 1);
       const done = total - arrowsLeft;
+
       ctx.fillStyle = BASE_BLUE;
       ctx.fillRect(20, 90, (done / total) * 200, 8);
+    }
+
+    function drawHitEffect(angle: number) {
+      ctx.save();
+      ctx.translate(center.x, center.y);
+      ctx.rotate(angle);
+      ctx.fillStyle = BASE_BLUE;
+      ctx.beginPath();
+      ctx.arc(0, -radius, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
 
     function loop() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      maybeChangeDirection();
+
       drawTarget();
-      drawArrows();
+      drawStuckArrows();
+      drawFlyingArrows();
       drawUI();
 
       rotation += speed;
+
+      // Animate flying arrows
+      flyingArrows.forEach(a => {
+        a.progress += 0.12;
+      });
+
+      // When arrow reaches target
+      for (let i = flyingArrows.length - 1; i >= 0; i--) {
+        if (flyingArrows[i].progress >= 1) {
+          const angle = flyingArrows[i].angle;
+
+          if (checkCollision(angle)) {
+            setGameOver(true);
+            flyingArrows.splice(i, 1);
+            return;
+          }
+
+          stuckArrows.push(angle);
+          drawHitEffect(angle);
+          flyingArrows.splice(i, 1);
+        }
+      }
+
       requestAnimationFrame(loop);
     }
 
@@ -83,23 +158,16 @@ export default function GameCanvas() {
 
       const angle = rotation % (Math.PI * 2);
 
-      if (checkCollision(angle)) {
-        setGameOver(true);
-        return;
-      }
-
-      arrows.push(angle);
+      flyingArrows.push({ angle, progress: 0 });
       setArrowsLeft(a => a - 1);
 
       if (arrowsLeft - 1 === 0) {
         setTimeout(() => {
-          arrows.length = 0;
+          stuckArrows.length = 0;
+          flyingArrows.length = 0;
           setLevel(l => l + 1);
           setArrowsLeft(5 + level);
-          speed =
-            (Math.random() * 0.04 + 0.02) *
-            (Math.random() > 0.5 ? 1 : -1);
-        }, 600);
+        }, 800);
       }
     };
   }, [level, arrowsLeft, gameOver]);
