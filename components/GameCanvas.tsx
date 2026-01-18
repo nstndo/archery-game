@@ -15,20 +15,23 @@ export default function GameCanvas() {
     const ARROW_LENGTH = 100;
     const ARROW_WIDTH = 3;
 
-    const COLOR_PRIMARY = "#0052FF";
-    const COLOR_DARK = "#050505";
+    const COLOR_PRIMARY = "#ffffff"; // Белые стрелы
+    const COLOR_DARK = "#ffffff";    // Белые стрелы в мишени
 
     let gameState = "playing";
     let level = 1;
     let rotationAngle = 0;
 
-    let currentRotationSpeed = 0.04;
-    let targetRotationSpeed = 0.04;
+    let currentRotationSpeed = 0.03;
+    let targetRotationSpeed = 0.03;
     let rotationChangeTimer = 0;
 
     let pins: { angle: number }[] = [];
     let activePin: { y: number; isMoving: boolean } | null = null;
     let pinsLeftToShoot = 0;
+
+    const targetImg = new Image();
+    targetImg.src = "/base-logo.png";
 
     function resize() {
       width = canvas.parentElement!.clientWidth;
@@ -85,9 +88,7 @@ export default function GameCanvas() {
     }
 
     function update() {
-      if (gameState === "playing") {
-        updateRotation();
-      }
+      if (gameState === "playing") updateRotation();
 
       if (gameState === "playing" && activePin && activePin.isMoving) {
         const speed = 45;
@@ -117,9 +118,7 @@ export default function GameCanvas() {
             pinsLeftToShoot--;
 
             if (pinsLeftToShoot <= 0) {
-              setTimeout(() => {
-                setupLevel(level + 1);
-              }, 500);
+              setTimeout(() => setupLevel(level + 1), 500);
             } else {
               prepareNextPin();
             }
@@ -167,27 +166,26 @@ export default function GameCanvas() {
       const centerX = width / 2;
       const centerY = height / 2;
 
+      // Мишень (логотип)
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(rotationAngle);
+      ctx.drawImage(
+        targetImg,
+        -TARGET_RADIUS,
+        -TARGET_RADIUS,
+        TARGET_RADIUS * 2,
+        TARGET_RADIUS * 2
+      );
 
+      // Стрелы в мишени
       pins.forEach(p => {
         drawArrow(0, 0, p.angle, COLOR_DARK);
       });
 
-      ctx.beginPath();
-      ctx.arc(0, 0, TARGET_RADIUS, 0, Math.PI * 2);
-      ctx.fillStyle = COLOR_DARK;
-      ctx.fill();
-
-      ctx.fillStyle = "white";
-      ctx.font = "bold 32px Arial";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(String(pinsLeftToShoot), 0, 2);
-
       ctx.restore();
 
+      // Активная стрела
       if (activePin && gameState === "playing") {
         drawArrow(centerX, activePin.y, undefined, COLOR_PRIMARY);
       }
@@ -217,7 +215,12 @@ export default function GameCanvas() {
   }, []);
 
   return (
-    <div style={{ height: "100vh", background: "#000020" }}>
+    <div
+      style={{
+        height: "100vh",
+        background: "linear-gradient(180deg, #000020, #0000ff)",
+      }}
+    >
       <canvas
         ref={canvasRef}
         style={{ width: "100%", height: "100%" }}
