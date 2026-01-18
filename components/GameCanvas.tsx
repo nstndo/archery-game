@@ -4,47 +4,47 @@ import { useEffect, useRef, useState } from "react";
 
 const BASE_BLUE = "#0000ff";
 
-type FlyingArrow = {
+type Arrow = {
   angle: number;
-  progress: number; // 0 → 1
+};
+
+type FlyingArrow = {
+  y: number;
 };
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const [level, setLevel] = useState(1);
-  const [arrowsLeft, setArrowsLeft] = useState(5);
+  const [arrowsLeft, setArrowsLeft] = useState(6);
   const [gameOver, setGameOver] = useState(false);
 
-  const stuckArrows = useRef<number[]>([]);
-  const flyingArrows = useRef<FlyingArrow[]>([]);
+  const stuckArrows = useRef<Arrow[]>([]);
+  const flyingArrow = useRef<FlyingArrow | null>(null);
 
   const rotation = useRef(0);
-  const speed = useRef(
-    (Math.random() * 0.04 + 0.02) * (Math.random() > 0.5 ? 1 : -1)
-  );
+  const speed = useRef(0.01);
+  const speedTarget = useRef(0.01);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
+
     const center = { x: canvas.width / 2, y: canvas.height / 2 - 40 };
     const radius = 90;
 
     const targetImg = new Image();
     targetImg.src = "/base-logo.png";
 
-    let lastDirectionChange = Date.now();
+    function updateRotation() {
+      // Плавное ускорение / замедление
+      speed.current += (speedTarget.current - speed.current) * 0.01;
+      rotation.current += speed.current;
 
-    function maybeChangeDirection() {
-      if (Date.now() - lastDirectionChange > 1500) {
-        if (Math.random() < 0.4) {
-          speed.current *= -1;
-        } else {
-          speed.current =
-            (Math.random() * 0.05 + 0.015) *
-            (Math.random() > 0.5 ? 1 : -1);
-        }
-        lastDirectionChange = Date.now();
+      // Иногда меняем скорость и направление
+      if (Math.random() < 0.005) {
+        speedTarget.current =
+          (Math.random() * 0.03 + 0.005) * (Math.random() > 0.5 ? 1 : -1);
       }
     }
 
@@ -57,10 +57,10 @@ export default function GameCanvas() {
     }
 
     function drawStuckArrows() {
-      stuckArrows.current.forEach(angle => {
+      stuckArrows.current.forEach(a => {
         ctx.save();
         ctx.translate(center.x, center.y);
-        ctx.rotate(angle);
+        ctx.rotate(a.angle);
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 4;
         ctx.beginPath();
@@ -71,24 +71,24 @@ export default function GameCanvas() {
       });
     }
 
-    function drawFlyingArrows() {
-      flyingArrows.current.forEach(a => {
-        const dist = a.progress * (radius + 60); // ВАЖНО: старт снизу
-        ctx.save();
-        ctx.translate(center.x, center.y + 200); // стрелы летят СНИЗУ
-        ctx.rotate(a.angle);
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(0, -dist);
-        ctx.lineTo(0, -dist - 32);
-        ctx.stroke();
-        ctx.restore();
-      });
+    function drawFlyingArrow() {
+      if (!flyingArrow.current) return;
+
+      ctx.save();
+      ctx.translate(center.x, flyingArrow.current.y);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -32);
+      ctx.stroke();
+      ctx.restore();
     }
 
-    function checkCollision(newAngle: number) {
-      return stuckArrows.current.some(a => Math.abs(a - newAngle) < 0.25);
+    function checkCollision(angle: number) {
+      return stuckArrows.current.some(
+        a => Math.abs(a.angle - angle) < 0.25
+      );
     }
 
     function drawUI() {
@@ -97,55 +97,38 @@ export default function GameCanvas() {
       ctx.fillText(`Level ${level}`, 20, 40);
       ctx.fillText(`Arrows: ${arrowsLeft}`, 20, 70);
 
-      const total = 5 + (level - 1);
+      const total = 6 + (level - 1);
       const done = total - arrowsLeft;
 
       ctx.fillStyle = BASE_BLUE;
       ctx.fillRect(20, 90, (done / total) * 200, 8);
     }
 
-    function drawHitEffect(angle: number) {
-      ctx.save();
-      ctx.translate(center.x, center.y);
-      ctx.rotate(angle);
-      ctx.fillStyle = BASE_BLUE;
-      ctx.beginPath();
-      ctx.arc(0, -radius, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-
     function loop() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      maybeChangeDirection();
+      updateRotation();
 
       drawTarget();
       drawStuckArrows();
-      drawFlyingArrows();
+      drawFlyingArrow();
       drawUI();
 
-      rotation.current += speed.current;
+      // Полёт стрелы строго вверх
+      if (flyingArrow.current) {
+        flyingArrow.current.y -= 14;
 
-      // Анимация полёта
-      flyingArrows.current.forEach(a => {
-        a.progress += 0.08;
-      });
+        if (flyingArrow.current.y <= center.y - radius) {
+          const hitAngle = rotation.current % (Math.PI * 2);
 
-      // Когда стрела долетела
-      for (let i = flyingArrows.current.length - 1; i >= 0; i--) {
-        if (flyingArrows.current[i].progress >= 1) {
-          const angle = flyingArrows.current[i].angle;
-
-          if (checkCollision(angle)) {
+          if (checkCollision(hitAngle)) {
             setGameOver(true);
-            flyingArrows.current = [];
+            flyingArrow.current = null;
             return;
           }
 
-          stuckArrows.current.push(angle);
-          drawHitEffect(angle);
-          flyingArrows.current.splice(i, 1);
+          stuckArrows.current.push({ angle: hitAngle });
+          flyingArrow.current = null;
         }
       }
 
@@ -156,19 +139,20 @@ export default function GameCanvas() {
 
     canvas.onclick = () => {
       if (gameOver || arrowsLeft <= 0) return;
+      if (flyingArrow.current) return; // нельзя стрелять, пока летит другая
 
-      const angle = rotation.current % (Math.PI * 2);
+      flyingArrow.current = {
+        y: canvas.height - 60,
+      };
 
-      flyingArrows.current.push({ angle, progress: 0 });
       setArrowsLeft(a => a - 1);
 
       if (arrowsLeft - 1 === 0) {
         setTimeout(() => {
           stuckArrows.current = [];
-          flyingArrows.current = [];
           setLevel(l => l + 1);
-          setArrowsLeft(5 + level);
-        }, 800);
+          setArrowsLeft(6 + level);
+        }, 900);
       }
     };
   }, [level, arrowsLeft, gameOver]);
