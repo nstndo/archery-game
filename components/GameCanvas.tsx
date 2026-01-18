@@ -12,12 +12,10 @@ export default function GameCanvas() {
     function draw() {
       ctx.clearRect(0, 0, 300, 300);
 
-      // Circle
       ctx.beginPath();
       ctx.arc(150, 150, 100, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Arrows
       arrows.forEach(a => {
         ctx.save();
         ctx.translate(150, 150);

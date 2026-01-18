@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import GameCanvas from "@/components/GameCanvas";
+import GameCanvas from "../components/GameCanvas";
 
 export default function Home() {
   const [account, setAccount] = useState<string | null>(null);

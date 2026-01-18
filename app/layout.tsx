@@ -1,6 +1,8 @@
+import "./globals.css";
+
 export const metadata = {
   title: "Base Archery",
-  description: "Mini App on Base"
+  description: "Mini App on Base",
 };
 
 export default function RootLayout({
