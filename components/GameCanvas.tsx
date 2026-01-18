@@ -14,21 +14,22 @@ export default function GameCanvas() {
   const arrows: number[] = [];
 
   let rotation = 0;
-  let speed = (Math.random() * 0.02 + 0.01) * (Math.random() > 0.5 ? 1 : -1);
+  let speed = (Math.random() * 0.03 + 0.015) * (Math.random() > 0.5 ? 1 : -1);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
-    const center = { x: canvas.width / 2, y: canvas.height / 2 };
+    const center = { x: canvas.width / 2, y: canvas.height / 2 - 40 };
     const radius = 90;
 
+    const targetImg = new Image();
+    targetImg.src = "/base-logo.png";
+
     function drawTarget() {
-      const img = new Image();
-      img.src = "/base-logo.png"; // добавим ниже
       ctx.save();
       ctx.translate(center.x, center.y);
       ctx.rotate(rotation);
-      ctx.drawImage(img, -radius, -radius, radius * 2, radius * 2);
+      ctx.drawImage(targetImg, -radius, -radius, radius * 2, radius * 2);
       ctx.restore();
     }
 
@@ -41,7 +42,7 @@ export default function GameCanvas() {
         ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.moveTo(0, -radius);
-        ctx.lineTo(0, -radius - 30);
+        ctx.lineTo(0, -radius - 32);
         ctx.stroke();
         ctx.restore();
       });
@@ -56,6 +57,12 @@ export default function GameCanvas() {
       ctx.font = "20px Arial";
       ctx.fillText(`Level ${level}`, 20, 40);
       ctx.fillText(`Arrows: ${arrowsLeft}`, 20, 70);
+
+      // Progress bar
+      const total = 5 + (level - 1);
+      const done = total - arrowsLeft;
+      ctx.fillStyle = BASE_BLUE;
+      ctx.fillRect(20, 90, (done / total) * 200, 8);
     }
 
     function loop() {
@@ -90,7 +97,7 @@ export default function GameCanvas() {
           setLevel(l => l + 1);
           setArrowsLeft(5 + level);
           speed =
-            (Math.random() * 0.03 + 0.01) *
+            (Math.random() * 0.04 + 0.02) *
             (Math.random() > 0.5 ? 1 : -1);
         }, 600);
       }
@@ -112,16 +119,18 @@ export default function GameCanvas() {
         width={360}
         height={640}
         style={{
-          borderRadius: 12,
+          borderRadius: 16,
           background: "#000010",
         }}
       />
+
       {gameOver && (
         <div
           style={{
             position: "absolute",
             color: "white",
             fontSize: 32,
+            fontWeight: "bold",
           }}
         >
           Game Over
