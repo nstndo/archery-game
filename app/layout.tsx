@@ -27,6 +27,7 @@ export const metadata: Metadata = {
     images: [`${APP_URL}/opengraph-image.png`],
   },
   other: {
+    "base:app_id": "696eb06ac0ab25addaaaf6af",
     "fc:frame": JSON.stringify({
       version: "next",
       imageUrl: `${APP_URL}/opengraph-image.png`,
@@ -37,7 +38,7 @@ export const metadata: Metadata = {
           name: "Base Archery",
           url: APP_URL,
           splashImageUrl: `${APP_URL}/splash.png`,
-          splashBackgroundColor: "#000010"
+          splashBackgroundColor: "#ffffff"
         }
       }
     }),
