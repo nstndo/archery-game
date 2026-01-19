@@ -402,8 +402,12 @@ export default function Game() {
 
   // --- LEADERBOARD FETCHING ---
   const fetchLeaderboard = async () => {
-    if (!publicClient) return;
+    if (!publicClient) {
+        console.log("No public client available");
+        return;
+    }
     setIsLoadingLeaderboard(true);
+    console.log("Fetching logs from:", CONTRACT_ADDRESS);
     
     try {
         // Fetch logs
@@ -414,18 +418,22 @@ export default function Game() {
             toBlock: 'latest'
         });
 
+        console.log("Logs found:", logs.length);
+
         const recentLogs = logs.slice(-5).reverse();
         
         const data: LeaderboardEntry[] = [];
 
         for (const log of recentLogs) {
-            // Type assertion for logs to avoid TS error
-            const args = log.args as unknown as { tokenId?: bigint; to?: string };
-            const tokenId = args?.tokenId;
-            const owner = args?.to;
+            // Type assertion for logs
+            const args = log.args as { tokenId?: bigint; to?: string } | undefined;
             
-            if (tokenId === undefined) continue;
+            // Check if args or tokenId is undefined to satisfy TypeScript strict mode
+            if (!args || args.tokenId === undefined) continue;
 
+            const tokenId = args.tokenId;
+            const owner = args.to;
+            
             // Fetch Token URI
             try {
                 const tokenUri = await publicClient.readContract({
@@ -564,7 +572,7 @@ export default function Game() {
                         </div>
                     </div>
                     <button onClick={handleMint} disabled={isPending || isConfirming} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 mb-3 active:scale-98 transition-transform disabled:opacity-50 disabled:cursor-not-allowed`}>
-                        {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted! ✅' : 'Mint Record NFT'}
+                        {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted!' : 'Mint Record NFT'}
                     </button>
                     <button onClick={() => resetLevel(1)} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
                         Try Again
@@ -623,9 +631,14 @@ export default function Game() {
                             <div className="text-sm opacity-70">No records found yet. Be the first!</div>
                         )}
                     </div>
-                    <button onClick={closeModal} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
-                        Close
-                    </button>
+                    <div className="flex gap-2">
+                        <button onClick={fetchLeaderboard} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
+                            Refresh
+                        </button>
+                        <button onClick={closeModal} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
+                            Close
+                        </button>
+                    </div>
                 </>
             )}
 
