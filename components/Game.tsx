@@ -1,7 +1,22 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { baseSepolia } from 'viem/chains'; // Используем тестовую сеть
+
+// --- ABI Смарт-контракта (Минимальный) ---
+const CONTRACT_ABI = [
+  {
+    inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
+    name: "mintScore",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function"
+  }
+] as const;
+
+// АДРЕС ВАШЕГО КОНТРАКТА
+const CONTRACT_ADDRESS = "0xB84FC8E428DAFAeef8B577c72366ed651dD89e8d"; 
 
 // --- Types ---
 interface Arrow {
@@ -28,6 +43,12 @@ export default function Game() {
   const { address, isConnected } = useAccount();
   const { connectors, connect } = useConnect();
   const { disconnect } = useDisconnect();
+  
+  // Contract Hooks
+  const { data: hash, isPending, writeContract } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
 
   // UI State
   const [level, setLevel] = useState(1);
@@ -37,10 +58,10 @@ export default function Game() {
   const [showFaq, setShowFaq] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   
-  // Theme State (handled via class on body/parent, but we need it here for canvas drawing)
+  // Theme State
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
 
-  // Game Logic Refs (Mutable state without re-renders)
+  // Game Logic Refs
   const gameState = useRef<'playing' | 'gameover' | 'level_complete' | 'paused'>('playing');
   const stuckArrows = useRef<Arrow[]>([]);
   const flyingArrow = useRef<{ y: number } | null>(null);
@@ -91,9 +112,7 @@ export default function Game() {
     let targetRadius = 90;
     const arrowLength = 65;
 
-    // Resize Handler with High DPI Support
     const handleResize = () => {
-      // Use containerRef for stable dimensions
       const parent = containerRef.current;
       if (parent) {
         width = parent.clientWidth;
@@ -116,70 +135,61 @@ export default function Game() {
     };
 
     window.addEventListener('resize', handleResize);
-    // Initial resize to set correct size immediately
     handleResize();
 
-    // Helper: Draw Arrow
     const drawArrow = (x: number, y: number, angle?: number, isStuck = false) => {
       ctx.save();
-      // Arrow color depends on theme
       const color = currentTheme === 'dark' ? '#ffffff' : '#0000ff';
       ctx.fillStyle = color;
-      
-      // Add a slight glow for a futuristic look
       ctx.shadowColor = currentTheme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,255,0.4)';
       ctx.shadowBlur = 8;
+
+      const headLen = 20;
+      const headWidth = 12;
+      const shaftWidth = 3;
 
       if (isStuck) {
         ctx.rotate(angle || 0);
         ctx.translate(targetRadius, 0);
         
-        // --- HORIZONTAL DESIGN (Stuck) ---
-        // 1. Shaft (Rounded body)
         ctx.beginPath();
         ctx.roundRect(0, -1.5, arrowLength, 3, 2);
         ctx.fill();
 
-        // 2. Head (Spear shape)
         ctx.beginPath();
-        ctx.moveTo(-2, 0); // Tip slightly inside for visual connection
+        ctx.moveTo(-2, 0);
         ctx.lineTo(12, -7);
-        ctx.lineTo(8, 0);  // Indent
+        ctx.lineTo(8, 0);
         ctx.lineTo(12, 7);
         ctx.closePath();
         ctx.fill();
 
-        // 3. Tail (Stabilizers)
         ctx.beginPath();
         const tailX = arrowLength;
         ctx.moveTo(tailX - 14, 0);
-        ctx.lineTo(tailX, -8); // Top wing back
-        ctx.lineTo(tailX + 2, -8); // Top wing edge
-        ctx.lineTo(tailX - 4, 0); // Center notch
-        ctx.lineTo(tailX + 2, 8); // Bottom wing edge
-        ctx.lineTo(tailX, 8); // Bottom wing back
+        ctx.lineTo(tailX, -8);
+        ctx.lineTo(tailX + 2, -8);
+        ctx.lineTo(tailX - 4, 0);
+        ctx.lineTo(tailX + 2, 8);
+        ctx.lineTo(tailX, 8);
         ctx.closePath();
         ctx.fill();
 
       } else {
         ctx.translate(x, y);
         
-        // --- VERTICAL DESIGN (Flying) ---
-        // 1. Shaft
         ctx.beginPath();
         ctx.roundRect(-1.5, 0, 3, arrowLength, 2);
         ctx.fill();
 
-        // 2. Head
         ctx.beginPath();
-        ctx.moveTo(0, -2); // Tip
+        ctx.moveTo(0, -2);
         ctx.lineTo(-7, 12);
-        ctx.lineTo(0, 8);  // Indent
+        ctx.lineTo(0, 8);
         ctx.lineTo(7, 12);
         ctx.closePath();
         ctx.fill();
 
-        // 3. Tail
         ctx.beginPath();
         const tailY = arrowLength;
         ctx.moveTo(0, tailY - 14);
@@ -194,7 +204,6 @@ export default function Game() {
       ctx.restore();
     };
 
-    // Helper: Particles
     const spawnHitParticles = (x: number, y: number) => {
       const bImg = currentTheme === 'dark' ? assets.current.shardB : assets.current.shardB_Blue;
       const aseImg = currentTheme === 'dark' ? assets.current.shardAse : assets.current.shardAse_Blue;
@@ -217,7 +226,6 @@ export default function Game() {
     });
 
     const updateAndDrawParticles = () => {
-        // Update
         for (let i = particles.current.length - 1; i >= 0; i--) {
             let p = particles.current[i];
             p.x += p.vx;
@@ -227,7 +235,6 @@ export default function Game() {
             p.life -= 0.02;
             if (p.life <= 0) particles.current.splice(i, 1);
         }
-        // Draw
         particles.current.forEach(p => {
             if (p.img.complete) {
                 ctx.save();
@@ -240,7 +247,6 @@ export default function Game() {
         });
     };
 
-    // Main Draw Loop
     const loop = () => {
       ctx.clearRect(0, 0, width, height);
       
@@ -248,7 +254,6 @@ export default function Game() {
       const centerY = height * 0.35;
       const startArrowY = height * 0.82;
 
-      // 1. Draw Target
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(rotation.current);
@@ -263,7 +268,6 @@ export default function Game() {
         ctx.lineWidth = 2;
         ctx.stroke();
       } else {
-        // Fallback target
         ctx.beginPath();
         ctx.arc(0, 0, targetRadius, 0, Math.PI * 2);
         ctx.fillStyle = '#0000ff';
@@ -271,19 +275,15 @@ export default function Game() {
       }
       ctx.restore();
 
-      // 2. Draw Stuck Arrows
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(rotation.current);
       stuckArrows.current.forEach(a => drawArrow(0, 0, a.angle, true));
       ctx.restore();
 
-      // 3. Particles (Always update)
       updateAndDrawParticles();
 
-      // 4. Game Physics (Only when playing)
       if (gameState.current === 'playing') {
-        // Rotation Logic
         rotationChangeTimer.current--;
         if (rotationChangeTimer.current <= 0) {
             rotationChangeTimer.current = 60 + Math.random() * 120;
@@ -294,9 +294,7 @@ export default function Game() {
         currentSpeed.current += (targetSpeed.current - currentSpeed.current) * 0.03;
         rotation.current += currentSpeed.current;
 
-        // Flying Arrow Logic
         if (flyingArrow.current) {
-            // Speed increased from 25 to 40
             flyingArrow.current.y -= 40;
             const impactY = centerY + targetRadius;
 
@@ -309,7 +307,7 @@ export default function Game() {
                 const collision = stuckArrows.current.some(a => {
                     let diff = Math.abs(a.angle - hitAngle);
                     if (diff > Math.PI) diff = (Math.PI * 2) - diff;
-                    return diff < 0.04; // Strict Hitbox (approx 2.3 deg)
+                    return diff < 0.04; 
                 });
 
                 if (collision) {
@@ -320,7 +318,6 @@ export default function Game() {
                     flyingArrow.current = null;
                     spawnHitParticles(centerX, impactY);
                     
-                    // React State Update for UI
                     setArrowsLeft(prev => {
                         const newVal = prev - 1;
                         if (newVal <= 0) {
@@ -334,7 +331,6 @@ export default function Game() {
         }
       }
 
-      // 5. Draw Active/Ready Arrow
       if (flyingArrow.current) {
         drawArrow(centerX, flyingArrow.current.y);
       } else if (arrowsLeft > 0 && gameState.current === 'playing') {
@@ -350,22 +346,17 @@ export default function Game() {
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [level, arrowsLeft, currentTheme]); // Re-bind if vital state changes
+  }, [level, arrowsLeft, currentTheme]);
 
-  // --- Actions ---
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeft <= 0) return;
-    // Calculate start position relative to container height, which is stable now
     const h = containerRef.current?.clientHeight || window.innerHeight;
     flyingArrow.current = { y: h * 0.82 };
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    // Prevent shooting if clicking buttons
     if ((e.target as HTMLElement).closest('button')) return;
-    // Prevent shooting if modal is open (except for modal buttons)
     if ((e.target as HTMLElement).closest('.modal-card')) return;
-    
     e.preventDefault();
     shoot();
   };
@@ -385,7 +376,6 @@ export default function Game() {
   const toggleTheme = () => {
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
     setCurrentTheme(newTheme);
-    // Toggle class on document body for global styles
     if (newTheme === 'dark') {
         document.body.classList.add('dark-mode');
     } else {
@@ -414,6 +404,22 @@ export default function Game() {
     gameState.current = 'paused';
     if (type === 'faq') setShowFaq(true);
     if (type === 'leaderboard') setShowLeaderboard(true);
+  };
+
+  // --- MINT LOGIC ---
+  const handleMint = async () => {
+    if (!isConnected) {
+        handleConnect();
+        return;
+    }
+    
+    writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: 'mintScore',
+        args: [BigInt(level)], 
+        chain: baseSepolia, 
+    });
   };
 
   return (
@@ -500,8 +506,12 @@ export default function Game() {
                         </div>
                     </div>
 
-                    <button className="w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 mb-3 active:scale-98 transition-transform">
-                        Mint Record NFT
+                    <button 
+                        onClick={handleMint}
+                        disabled={isPending || isConfirming}
+                        className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 mb-3 active:scale-98 transition-transform disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                        {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted! ✅' : 'Mint Record NFT'}
                     </button>
                     <button onClick={() => resetLevel(1)} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
                         Try Again

@@ -1,0 +1,18 @@
+{
+  "accountAssociation": {
+    "header": "eyJmaWQiOjE5ODgyNywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiJweXRoYWdvcmFzIn0",
+    "payload": "eyJkb21haW4iOiJiYXNlLWFyY2hlcnktZ2FtZS52ZXJjZWwuYXBwIn0",
+    "signature": "MHgyYj..." 
+  },
+  "frame": {
+    "version": "1",
+    "name": "Base Archery",
+    "iconUrl": "https://base-archery-game.vercel.app/base-logo.png",
+    "homeUrl": "https://base-archery-game.vercel.app",
+    "imageUrl": "https://base-archery-game.vercel.app/opengraph-image.png",
+    "buttonTitle": "Play Archery",
+    "splashImageUrl": "https://base-archery-game.vercel.app/splash.png",
+    "splashBackgroundColor": "#000010",
+    "webhookUrl": "https://base-archery-game.vercel.app/api/webhook"
+  }
+}
