@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, useReadContract } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
 import { baseSepolia } from 'viem/chains';
-import sdk from '@farcaster/frame-sdk'; // Импорт SDK для Base App / Farcaster
+import { parseAbiItem } from 'viem';
+import sdk from '@farcaster/frame-sdk';
 
-// --- ABI Смарт-контракта (Включая getLeaderboard) ---
+// --- ABI Смарт-контракта ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -70,21 +71,11 @@ export default function Game() {
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
+  const publicClient = usePublicClient();
   
-  // Хуки для записи в контракт (Минт)
-  const { data: hash, isPending, writeContract } = useWriteContract();
+  // Добавили reset для сброса состояния транзакции
+  const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
-
-  // Хук для чтения Лидерборда
-  const { data: rawLeaderboard, refetch: refetchLeaderboard, isLoading: isReadingLeaderboard } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: 'getLeaderboard',
-    chainId: baseSepolia.id,
-    query: {
-        enabled: false, // Не загружать автоматически при старте
-    }
-  });
 
   // UI State
   const [level, setLevel] = useState(1);
@@ -94,6 +85,7 @@ export default function Game() {
   const [showFaq, setShowFaq] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
 
@@ -116,11 +108,10 @@ export default function Game() {
     shardAse_Blue: null as HTMLImageElement | null,
   });
 
-  // Инициализация Base App SDK
+  // Base App SDK Init
   useEffect(() => {
     const initSDK = async () => {
         try {
-            // Сообщаем Base App / Farcaster, что мини-приложение загрузилось
             await sdk.actions.ready();
         } catch (err) {
             console.warn("Failed to initialize Base App SDK:", err);
@@ -129,7 +120,7 @@ export default function Game() {
     initSDK();
   }, []);
 
-  // Инициализация ассетов
+  // Assets Init
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const loadImg = (src: string) => {
@@ -145,24 +136,7 @@ export default function Game() {
     assets.current.shardAse_Blue = loadImg('https://base-archery-game.vercel.app/ase-blue.webp');
   }, []);
 
-  // Обработка данных лидерборда после загрузки
-  useEffect(() => {
-    if (rawLeaderboard) {
-        // Приводим данные к нужному формату
-        const formatted: LeaderboardEntry[] = (rawLeaderboard as any[]).map((item) => ({
-            address: item.wallet,
-            level: Number(item.maxLevel),
-            tokenId: item.tokenId.toString()
-        }));
-        
-        // Сортируем по убыванию уровня
-        formatted.sort((a, b) => b.level - a.level);
-        
-        setLeaderboardData(formatted);
-    }
-  }, [rawLeaderboard]);
-
-  // Основной игровой цикл
+  // Main Game Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -420,6 +394,9 @@ export default function Game() {
   };
 
   const resetLevel = (lvl: number) => {
+    // Сбрасываем состояние контракта (удаляем старый хеш)
+    if (resetContract) resetContract(); 
+    
     setLevel(lvl);
     setArrowsLeft(10);
     stuckArrows.current = [];
@@ -454,8 +431,28 @@ export default function Game() {
   };
 
   const fetchLeaderboard = async () => {
-    // Просто перезапрашиваем данные из хука useReadContract
-    refetchLeaderboard();
+    if (!publicClient) return;
+    setIsLoadingLeaderboard(true);
+    try {
+        const data = await publicClient.readContract({
+            address: CONTRACT_ADDRESS,
+            abi: CONTRACT_ABI,
+            functionName: 'getLeaderboard',
+        }) as any[]; // viem returns array of structs
+
+        const formatted: LeaderboardEntry[] = data.map((item) => ({
+            address: item.wallet,
+            level: Number(item.maxLevel),
+            tokenId: item.tokenId.toString()
+        }));
+        
+        formatted.sort((a, b) => b.level - a.level);
+        setLeaderboardData(formatted);
+    } catch (e) {
+        console.error("Fetch leaderboard error", e);
+    } finally {
+        setIsLoadingLeaderboard(false);
+    }
   };
 
   const openModal = (type: 'faq' | 'leaderboard') => {
@@ -567,8 +564,15 @@ export default function Game() {
                             <div className="text-3xl font-black text-[#0000ff]">{level}</div>
                         </div>
                     </div>
-                    <button onClick={handleMint} disabled={isPending || isConfirming} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 mb-3 active:scale-98 transition-transform disabled:opacity-50 disabled:cursor-not-allowed`}>
-                        {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted! ✅' : 'Mint Record NFT'}
+                    <button 
+                        onClick={handleMint} 
+                        disabled={isPending || isConfirming || isConfirmed} 
+                        className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest 
+                            ${isConfirmed ? 'bg-green-500 border-green-500' : 'bg-[#0000ff]'} 
+                            text-white shadow-lg shadow-blue-600/30 mb-3 active:scale-98 transition-transform disabled:opacity-70 disabled:cursor-not-allowed`
+                        }
+                    >
+                        {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted' : 'Mint Record NFT'}
                     </button>
                     <button onClick={() => resetLevel(1)} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
                         Try Again
@@ -609,7 +613,7 @@ export default function Game() {
                 <div className="flex flex-col h-full px-5 pb-5">
                     <h2 className={`font-orbitron text-2xl font-black mb-6 uppercase flex-shrink-0 ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>LEADERBOARD</h2>
                     <div className={`flex-1 overflow-y-auto mb-4 font-roboto text-left ${currentTheme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
-                        {isReadingLeaderboard ? (
+                        {isLoadingLeaderboard ? (
                             <div className="text-center py-10">Loading blockchain data...</div>
                         ) : leaderboardData.length > 0 ? (
                             <div className="space-y-2">
