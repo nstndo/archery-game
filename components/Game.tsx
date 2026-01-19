@@ -1,11 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, useReadContract } from 'wagmi';
 import { baseSepolia } from 'viem/chains';
-import { parseAbiItem } from 'viem';
 
-// --- ABI ---
+// --- ABI Смарт-контракта (Включая getLeaderboard) ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -15,18 +14,29 @@ const CONTRACT_ABI = [
     type: "function"
   },
   {
-    inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }],
-    name: "tokenURI",
-    outputs: [{ internalType: "string", name: "", type: "string" }],
+    inputs: [],
+    name: "getLeaderboard",
+    outputs: [
+      {
+        components: [
+          { internalType: "address", name: "wallet", type: "address" },
+          { internalType: "uint256", name: "maxLevel", type: "uint256" },
+          { internalType: "uint256", name: "tokenId", type: "uint256" }
+        ],
+        internalType: "struct ArcheryScore.PlayerStats[]",
+        name: "",
+        type: "tuple[]"
+      }
+    ],
     stateMutability: "view",
     type: "function"
   }
 ] as const;
 
-// Contract Address
-const CONTRACT_ADDRESS = "0xB84FC8E428DAFAeef8B577c72366ed651dD89e8d"; 
+// АДРЕС ВАШЕГО КОНТРАКТА
+const CONTRACT_ADDRESS = "0x2441E2FfD92d63f003Fc63626e69FA79A7AaEEa7"; 
 
-// --- Types ---
+// --- Типы ---
 interface Arrow {
   angle: number;
 }
@@ -45,7 +55,7 @@ interface Particle {
 
 interface LeaderboardEntry {
     address: string;
-    level: number; // Changed to number for sorting
+    level: number;
     tokenId: string;
 }
 
@@ -59,10 +69,21 @@ export default function Game() {
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
-  const publicClient = usePublicClient();
   
+  // Хуки для записи в контракт (Минт)
   const { data: hash, isPending, writeContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+
+  // Хук для чтения Лидерборда
+  const { data: rawLeaderboard, refetch: refetchLeaderboard, isLoading: isReadingLeaderboard } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'getLeaderboard',
+    chainId: baseSepolia.id,
+    query: {
+        enabled: false, // Не загружать автоматически при старте
+    }
+  });
 
   // UI State
   const [level, setLevel] = useState(1);
@@ -72,7 +93,6 @@ export default function Game() {
   const [showFaq, setShowFaq] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
-  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
 
@@ -95,7 +115,7 @@ export default function Game() {
     shardAse_Blue: null as HTMLImageElement | null,
   });
 
-  // Init Assets
+  // Инициализация ассетов
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const loadImg = (src: string) => {
@@ -111,7 +131,24 @@ export default function Game() {
     assets.current.shardAse_Blue = loadImg('https://base-archery-game.vercel.app/ase-blue.webp');
   }, []);
 
-  // Main Game Loop
+  // Обработка данных лидерборда после загрузки
+  useEffect(() => {
+    if (rawLeaderboard) {
+        // Приводим данные к нужному формату
+        const formatted: LeaderboardEntry[] = (rawLeaderboard as any[]).map((item) => ({
+            address: item.wallet,
+            level: Number(item.maxLevel),
+            tokenId: item.tokenId.toString()
+        }));
+        
+        // Сортируем по убыванию уровня
+        formatted.sort((a, b) => b.level - a.level);
+        
+        setLeaderboardData(formatted);
+    }
+  }, [rawLeaderboard]);
+
+  // Основной игровой цикл
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -402,84 +439,9 @@ export default function Game() {
     if (gameState.current === 'paused') gameState.current = 'playing';
   };
 
-  // --- LEADERBOARD FETCHING ---
   const fetchLeaderboard = async () => {
-    if (!publicClient) {
-        console.log("No public client available");
-        return;
-    }
-    setIsLoadingLeaderboard(true);
-    console.log("Fetching logs from:", CONTRACT_ADDRESS);
-    
-    try {
-        const blockNumber = await publicClient.getBlockNumber();
-        const fromBlock = blockNumber - BigInt(50000) > BigInt(0) ? blockNumber - BigInt(50000) : BigInt(0);
-
-        // Fetch logs (last 20 logs to save resources, but enough to show some variety)
-        // Note: For a real production app, use an indexer like The Graph.
-        const logs = await publicClient.getLogs({
-            address: CONTRACT_ADDRESS,
-            event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-            fromBlock: fromBlock,
-            toBlock: 'latest'
-        });
-
-        console.log("Logs found:", logs.length);
-
-        // Map to store best level per address
-        const bestScores = new Map<string, { level: number, tokenId: string }>();
-        
-        // Process logs in reverse (newest first)
-        const recentLogs = logs.reverse().slice(0, 20); // Process last 20 logs
-
-        for (const log of recentLogs) {
-            const args = log.args as { tokenId?: bigint; to?: string } | undefined;
-            if (!args || args.tokenId === undefined || !args.to) continue;
-
-            const tokenId = args.tokenId;
-            const owner = args.to;
-            
-            try {
-                const tokenUri = await publicClient.readContract({
-                    address: CONTRACT_ADDRESS,
-                    abi: CONTRACT_ABI,
-                    functionName: 'tokenURI',
-                    args: [tokenId]
-                }) as string;
-
-                if (tokenUri.startsWith('data:application/json;base64,')) {
-                    const json = atob(tokenUri.split(',')[1]);
-                    const metadata = JSON.parse(json);
-                    
-                    const levelAttr = metadata.attributes.find((a: any) => a.trait_type === 'Level');
-                    const currentLevel = levelAttr ? parseInt(levelAttr.value) : 0;
-
-                    // Update if this is a better score or new user
-                    const existing = bestScores.get(owner);
-                    if (!existing || currentLevel > existing.level) {
-                        bestScores.set(owner, { level: currentLevel, tokenId: tokenId.toString() });
-                    }
-                }
-            } catch (e) {
-                console.error("Error fetching token", tokenId, e);
-            }
-        }
-        
-        // Convert map to array and sort by level descending
-        const data: LeaderboardEntry[] = Array.from(bestScores.entries())
-            .map(([address, info]) => ({
-                address: address,
-                level: info.level,
-                tokenId: info.tokenId
-            }))
-            .sort((a, b) => b.level - a.level);
-        
-        setLeaderboardData(data);
-    } catch (e) {
-        console.error("Fetch leaderboard error", e);
-    } finally {
-        setIsLoadingLeaderboard(false);
-    }
+    // Просто перезапрашиваем данные из хука useReadContract
+    refetchLeaderboard();
   };
 
   const openModal = (type: 'faq' | 'leaderboard') => {
@@ -633,7 +595,7 @@ export default function Game() {
                 <div className="flex flex-col h-full px-5 pb-5">
                     <h2 className={`font-orbitron text-2xl font-black mb-6 uppercase flex-shrink-0 ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>LEADERBOARD</h2>
                     <div className={`flex-1 overflow-y-auto mb-4 font-roboto text-left ${currentTheme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
-                        {isLoadingLeaderboard ? (
+                        {isReadingLeaderboard ? (
                             <div className="text-center py-10">Loading blockchain data...</div>
                         ) : leaderboardData.length > 0 ? (
                             <div className="space-y-2">

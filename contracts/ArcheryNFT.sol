@@ -10,6 +10,16 @@ contract ArcheryScore is ERC721URIStorage {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
+    struct PlayerStats {
+        address wallet;
+        uint256 maxLevel;
+        uint256 tokenId;
+    }
+
+    PlayerStats[] public leaderboard;
+    
+    mapping(address => uint256) private playerIndex;
+
     constructor() ERC721("Base Archery Score", "ARCHERY") {}
 
     function mintScore(uint256 level) public returns (uint256) {
@@ -18,7 +28,9 @@ contract ArcheryScore is ERC721URIStorage {
 
         _mint(msg.sender, newItemId);
         
-        // Генерируем простую SVG картинку с уровнем прямо в блокчейне
+        updateLeaderboard(msg.sender, level, newItemId);
+        // -------------------------
+
         string memory svg = string(abi.encodePacked(
             '<svg xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMinYMin meet" viewBox="0 0 350 350"><style>.base { fill: #0052FF; font-family: sans-serif; }.text { fill: white; font-weight: bold; }</style><rect width="100%" height="100%" fill="#000010" /><circle cx="175" cy="175" r="100" class="base" /><text x="50%" y="50%" class="text" dominant-baseline="middle" text-anchor="middle" font-size="80">',
             Strings.toString(level),
@@ -36,5 +48,24 @@ contract ArcheryScore is ERC721URIStorage {
         _setTokenURI(newItemId, finalTokenUri);
 
         return newItemId;
+    }
+
+    function updateLeaderboard(address player, uint256 level, uint256 tokenId) internal {
+        uint256 idx = playerIndex[player];
+
+        if (idx == 0) {
+            // Новый игрок
+            leaderboard.push(PlayerStats(player, level, tokenId));
+            playerIndex[player] = leaderboard.length;
+        } else {
+            if (level > leaderboard[idx - 1].maxLevel) {
+                leaderboard[idx - 1].maxLevel = level;
+                leaderboard[idx - 1].tokenId = tokenId;
+            }
+        }
+    }
+
+    function getLeaderboard() public view returns (PlayerStats[] memory) {
+        return leaderboard;
     }
 }
