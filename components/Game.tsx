@@ -415,7 +415,7 @@ export default function Game() {
         // Get current block number
         const blockNumber = await publicClient.getBlockNumber();
         // Calculate fromBlock safely (e.g. 50000 blocks ago) to avoid RPC limit errors
-        const fromBlock = blockNumber - 50000n > 0n ? blockNumber - 50000n : 0n;
+        const fromBlock = blockNumber - BigInt(50000) > BigInt(0) ? blockNumber - BigInt(50000) : BigInt(0);
 
         // Fetch logs with limited range
         const logs = await publicClient.getLogs({
@@ -577,7 +577,7 @@ export default function Game() {
                         </div>
                     </div>
                     <button onClick={handleMint} disabled={isPending || isConfirming} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 mb-3 active:scale-98 transition-transform disabled:opacity-50 disabled:cursor-not-allowed`}>
-                        {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted! ✅' : 'Mint Record NFT'}
+                        {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted!' : 'Mint Record NFT'}
                     </button>
                     <button onClick={() => resetLevel(1)} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
                         Try Again
