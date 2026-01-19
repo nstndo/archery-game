@@ -1,40 +1,16 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import GameCanvas from "../components/GameCanvas";
+import dynamic from 'next/dynamic';
+
+// Dynamically import the Game component to disable Server Side Rendering (SSR)
+// This is necessary because the game logic relies heavily on window and canvas
+const Game = dynamic(() => import('@/components/Game'), { ssr: false });
 
 export default function Home() {
-  const [account, setAccount] = useState<string | null>(null);
-
-  async function connectWallet() {
-    if (!window.ethereum) {
-      alert("Wallet not found");
-      return;
-    }
-
-    const accounts = await window.ethereum.request({
-      method: "eth_requestAccounts",
-    });
-
-    setAccount(accounts[0]);
-  }
-
   return (
-    <main style={{ textAlign: "center", padding: 20 }}>
-      <h1>🎯 Base Archery</h1>
-
-      {!account && (
-        <button onClick={connectWallet}>
-          Connect Wallet
-        </button>
-      )}
-
-      {account && (
-        <>
-          <p>Connected: {account}</p>
-          <GameCanvas />
-        </>
-      )}
+    <main className="flex min-h-screen flex-col items-center justify-center p-0 m-0 overflow-hidden bg-white dark:bg-[#000010]">
+      {/* Game Container */}
+      <Game />
     </main>
   );
 }
