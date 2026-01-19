@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, useReadContract } from 'wagmi';
 import { baseSepolia } from 'viem/chains';
+import sdk from '@farcaster/frame-sdk'; // Импорт SDK для Base App / Farcaster
 
 // --- ABI Смарт-контракта (Включая getLeaderboard) ---
 const CONTRACT_ABI = [
@@ -114,6 +115,19 @@ export default function Game() {
     shardB_Blue: null as HTMLImageElement | null,
     shardAse_Blue: null as HTMLImageElement | null,
   });
+
+  // Инициализация Base App SDK
+  useEffect(() => {
+    const initSDK = async () => {
+        try {
+            // Сообщаем Base App / Farcaster, что мини-приложение загрузилось
+            await sdk.actions.ready();
+        } catch (err) {
+            console.warn("Failed to initialize Base App SDK:", err);
+        }
+    };
+    initSDK();
+  }, []);
 
   // Инициализация ассетов
   useEffect(() => {
