@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain } from 'wagmi';
-import { baseSepolia } from 'viem/chains'; // Используем тестовую сеть
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
+import { baseSepolia } from 'viem/chains';
+import { parseAbiItem } from 'viem';
 
-// --- ABI Смарт-контракта (Минимальный) ---
+// --- ABI ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -12,10 +13,16 @@ const CONTRACT_ABI = [
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "nonpayable",
     type: "function"
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }],
+    name: "tokenURI",
+    outputs: [{ internalType: "string", name: "", type: "string" }],
+    stateMutability: "view",
+    type: "function"
   }
 ] as const;
 
-// АДРЕС ВАШЕГО КОНТРАКТА
 const CONTRACT_ADDRESS = "0xB84FC8E428DAFAeef8B577c72366ed651dD89e8d"; 
 
 // --- Types ---
@@ -35,22 +42,26 @@ interface Particle {
   size: number;
 }
 
+interface LeaderboardEntry {
+    address: string;
+    level: string;
+    tokenId: string;
+}
+
 export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  // Wallet Hooks
+  // Web3 Hooks
   const { address, isConnected } = useAccount();
   const { connectors, connect } = useConnect();
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
+  const publicClient = usePublicClient();
   
-  // Contract Hooks
   const { data: hash, isPending, writeContract } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
-  });
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
 
   // UI State
   const [level, setLevel] = useState(1);
@@ -59,8 +70,9 @@ export default function Game() {
   const [isLevelComplete, setIsLevelComplete] = useState(false);
   const [showFaq, setShowFaq] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   
-  // Theme State
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
 
   // Game Logic Refs
@@ -74,7 +86,6 @@ export default function Game() {
   const targetSpeed = useRef(0.04);
   const rotationChangeTimer = useRef(0);
 
-  // Assets Refs
   const assets = useRef({
     target: null as HTMLImageElement | null,
     shardB: null as HTMLImageElement | null,
@@ -83,17 +94,14 @@ export default function Game() {
     shardAse_Blue: null as HTMLImageElement | null,
   });
 
-  // Init Assets
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
     const loadImg = (src: string) => {
       const img = new Image();
       img.crossOrigin = "Anonymous";
       img.src = src;
       return img;
     };
-
     assets.current.target = loadImg('https://base-archery-game.vercel.app/base-logo.webp');
     assets.current.shardB = loadImg('https://base-archery-game.vercel.app/b-white.webp');
     assets.current.shardAse = loadImg('https://base-archery-game.vercel.app/ase-white.webp');
@@ -101,7 +109,6 @@ export default function Game() {
     assets.current.shardAse_Blue = loadImg('https://base-archery-game.vercel.app/ase-blue.webp');
   }, []);
 
-  // Main Game Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -127,12 +134,10 @@ export default function Game() {
       const dpr = window.devicePixelRatio || 1;
       canvas.width = width * dpr;
       canvas.height = height * dpr;
-      
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-
       targetRadius = width < 380 ? 80 : 90;
     };
 
@@ -153,11 +158,9 @@ export default function Game() {
       if (isStuck) {
         ctx.rotate(angle || 0);
         ctx.translate(targetRadius, 0);
-        
         ctx.beginPath();
         ctx.roundRect(0, -1.5, arrowLength, 3, 2);
         ctx.fill();
-
         ctx.beginPath();
         ctx.moveTo(-2, 0);
         ctx.lineTo(12, -7);
@@ -165,7 +168,6 @@ export default function Game() {
         ctx.lineTo(12, 7);
         ctx.closePath();
         ctx.fill();
-
         ctx.beginPath();
         const tailX = arrowLength;
         ctx.moveTo(tailX - 14, 0);
@@ -176,14 +178,11 @@ export default function Game() {
         ctx.lineTo(tailX, 8);
         ctx.closePath();
         ctx.fill();
-
       } else {
         ctx.translate(x, y);
-        
         ctx.beginPath();
         ctx.roundRect(-1.5, 0, 3, arrowLength, 2);
         ctx.fill();
-
         ctx.beginPath();
         ctx.moveTo(0, -2);
         ctx.lineTo(-7, 12);
@@ -191,7 +190,6 @@ export default function Game() {
         ctx.lineTo(7, 12);
         ctx.closePath();
         ctx.fill();
-
         ctx.beginPath();
         const tailY = arrowLength;
         ctx.moveTo(0, tailY - 14);
@@ -209,7 +207,6 @@ export default function Game() {
     const spawnHitParticles = (x: number, y: number) => {
       const bImg = currentTheme === 'dark' ? assets.current.shardB : assets.current.shardB_Blue;
       const aseImg = currentTheme === 'dark' ? assets.current.shardAse : assets.current.shardAse_Blue;
-
       if (bImg) particles.current.push(createParticle(x, y, bImg, 24));
       if (aseImg) {
         for (let i = 0; i < 3; i++) particles.current.push(createParticle(x, y, aseImg, 18));
@@ -251,7 +248,6 @@ export default function Game() {
 
     const loop = () => {
       ctx.clearRect(0, 0, width, height);
-      
       const centerX = width / 2;
       const centerY = height * 0.35;
       const startArrowY = height * 0.82;
@@ -319,7 +315,6 @@ export default function Game() {
                     stuckArrows.current.push({ angle: hitAngle });
                     flyingArrow.current = null;
                     spawnHitParticles(centerX, impactY);
-                    
                     setArrowsLeft(prev => {
                         const newVal = prev - 1;
                         if (newVal <= 0) {
@@ -378,11 +373,8 @@ export default function Game() {
   const toggleTheme = () => {
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
     setCurrentTheme(newTheme);
-    if (newTheme === 'dark') {
-        document.body.classList.add('dark-mode');
-    } else {
-        document.body.classList.remove('dark-mode');
-    }
+    if (newTheme === 'dark') document.body.classList.add('dark-mode');
+    else document.body.classList.remove('dark-mode');
   };
 
   const handleConnect = () => {
@@ -390,10 +382,7 @@ export default function Game() {
         disconnect();
     } else {
         const coinbaseConnector = connectors.find((c) => c.id === 'coinbaseWalletSDK');
-        // Подключаемся с явным указанием сети Base Sepolia
-        if (coinbaseConnector) {
-            connect({ connector: coinbaseConnector, chainId: baseSepolia.id });
-        }
+        if (coinbaseConnector) connect({ connector: coinbaseConnector, chainId: baseSepolia.id });
     }
   };
 
@@ -403,32 +392,91 @@ export default function Game() {
     if (gameState.current === 'paused') gameState.current = 'playing';
   };
 
+  // --- LEADERBOARD FETCHING ---
+  const fetchLeaderboard = async () => {
+    if (!publicClient) return;
+    setIsLoadingLeaderboard(true);
+    
+    try {
+        // 1. Получаем последние события Transfer (Mint)
+        // В реальном приложении лучше использовать The Graph или индексер
+        // Здесь мы просто берем последние логи
+        const logs = await publicClient.getLogs({
+            address: CONTRACT_ADDRESS,
+            event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
+            fromBlock: 'earliest', // В продакшене ограничить диапазон!
+            toBlock: 'latest'
+        });
+
+        // Берем последние 5 минтов (обратный порядок)
+        const recentLogs = logs.slice(-5).reverse();
+        
+        const data: LeaderboardEntry[] = [];
+
+        for (const log of recentLogs) {
+            // @ts-ignore
+            const tokenId = log.args.tokenId;
+            const owner = log.args.to;
+            
+            // Читаем tokenURI
+            try {
+                const tokenUri = await publicClient.readContract({
+                    address: CONTRACT_ADDRESS,
+                    abi: CONTRACT_ABI,
+                    functionName: 'tokenURI',
+                    args: [tokenId]
+                }) as string;
+
+                // Декодируем Base64 метаданные
+                if (tokenUri.startsWith('data:application/json;base64,')) {
+                    const json = atob(tokenUri.split(',')[1]);
+                    const metadata = JSON.parse(json);
+                    
+                    // Ищем уровень в атрибутах
+                    const levelAttr = metadata.attributes.find((a: any) => a.trait_type === 'Level');
+                    
+                    data.push({
+                        address: owner ? `${owner.slice(0,6)}...${owner.slice(-4)}` : 'Unknown',
+                        level: levelAttr ? levelAttr.value.toString() : '?',
+                        tokenId: tokenId.toString()
+                    });
+                }
+            } catch (e) {
+                console.error("Error fetching token", tokenId, e);
+            }
+        }
+        
+        setLeaderboardData(data);
+    } catch (e) {
+        console.error("Fetch leaderboard error", e);
+    } finally {
+        setIsLoadingLeaderboard(false);
+    }
+  };
+
   const openModal = (type: 'faq' | 'leaderboard') => {
     gameState.current = 'paused';
     if (type === 'faq') setShowFaq(true);
-    if (type === 'leaderboard') setShowLeaderboard(true);
+    if (type === 'leaderboard') {
+        setShowLeaderboard(true);
+        fetchLeaderboard(); // Загружаем данные при открытии
+    }
   };
 
-  // --- MINT LOGIC ---
   const handleMint = async () => {
     if (!isConnected) {
         handleConnect();
         return;
     }
-
-    // Проверяем сеть перед минтом
     if (chainId !== baseSepolia.id) {
         try {
             await switchChain({ chainId: baseSepolia.id });
-            // После смены сети пользователь должен нажать Mint еще раз, или можно вызвать автоматически,
-            // но лучше подождать завершения смены.
             return;
         } catch (error) {
             console.error("Failed to switch chain", error);
             return;
         }
     }
-    
     writeContract({
         address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
@@ -444,8 +492,6 @@ export default function Game() {
         className={`fixed inset-0 w-full h-[100dvh] max-h-[100dvh] max-w-[480px] mx-auto flex flex-col overflow-hidden transition-colors duration-300 ${currentTheme === 'light' ? 'bg-white text-black' : 'bg-[#000010] text-white'}`}
         style={{ touchAction: 'none' }} 
     >
-      
-      {/* Top Bar */}
       <div className={`flex justify-between items-center px-5 py-4 pt-[calc(15px+env(safe-area-inset-top))] backdrop-blur-md z-10 border-b transition-colors duration-300 ${currentTheme === 'light' ? 'bg-white/85 border-blue-600/10' : 'bg-[#000020]/85 border-white/10'}`}>
         <div className="font-orbitron font-black text-xl flex items-center gap-2 uppercase tracking-wide">
           BASE <span className="text-[#0000ff]">ARCHERY</span>
@@ -473,24 +519,17 @@ export default function Game() {
         </div>
       </div>
 
-      {/* Stats & Icons Overlay */}
       <div className="absolute top-[calc(70px+env(safe-area-inset-top))] w-full flex justify-center items-center gap-4 z-10 pointer-events-none px-5">
-        
-        {/* Leaderboard Button */}
         <button 
             onClick={() => openModal('leaderboard')}
             className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
         >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
         </button>
-        
-        {/* Level Badge */}
         <div className={`px-5 py-2 rounded-2xl border backdrop-blur-sm text-center min-w-[120px] ${currentTheme === 'light' ? 'bg-blue-50/80 border-blue-200' : 'bg-black/50 border-white/10'}`}>
             <div className="text-base font-bold tracking-widest font-orbitron">LEVEL {level}</div>
             <div className="text-sm font-bold text-[#0000ff] font-orbitron">{arrowsLeft} ARROWS</div>
         </div>
-
-        {/* FAQ Button */}
         <button 
             onClick={() => openModal('faq')}
             className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
@@ -505,28 +544,20 @@ export default function Game() {
         onPointerDown={handlePointerDown}
       />
 
-      {/* Modals Overlay */}
       <div className={`absolute top-0 left-0 w-full h-full bg-black/60 backdrop-blur-sm flex flex-col justify-end transition-opacity duration-300 z-20 ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-        
         <div className={`rounded-t-3xl p-6 pb-10 text-center transform transition-transform duration-300 border-t shadow-2xl ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'translate-y-0' : 'translate-y-full'} ${currentTheme === 'light' ? 'bg-white border-blue-100' : 'bg-[#1a1a1a] border-white/10'}`}>
             
             {isGameOver && (
                 <>
                     <h2 className={`font-orbitron text-2xl font-black mb-2 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>GAME OVER</h2>
                     <p className="font-orbitron text-sm text-gray-500 mb-6 tracking-wide">You hit another arrow!</p>
-                    
                     <div className={`rounded-2xl p-5 mb-6 border flex justify-center items-center ${currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-[#252525] border-white/5'}`}>
                         <div className="text-center">
                             <div className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Level Reached</div>
                             <div className="text-3xl font-black text-[#0000ff]">{level}</div>
                         </div>
                     </div>
-
-                    <button 
-                        onClick={handleMint}
-                        disabled={isPending || isConfirming}
-                        className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 mb-3 active:scale-98 transition-transform disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
+                    <button onClick={handleMint} disabled={isPending || isConfirming} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 mb-3 active:scale-98 transition-transform disabled:opacity-50 disabled:cursor-not-allowed`}>
                         {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted! ✅' : 'Mint Record NFT'}
                     </button>
                     <button onClick={() => resetLevel(1)} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
@@ -566,11 +597,25 @@ export default function Game() {
 
             {showLeaderboard && (
                 <>
-                    <h2 className={`font-orbitron text-2xl font-black mb-6 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>LEADERBOARD</h2>
-                    <div className={`py-10 text-center font-roboto ${currentTheme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
-                        <div className="mb-2 text-3xl">🏆</div>
-                        <div>Global Leaderboard</div>
-                        <div className="text-sm mt-1 opacity-70">Coming soon...</div>
+                    <h2 className={`font-orbitron text-2xl font-black mb-6 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>RECENT CHAMPIONS</h2>
+                    <div className={`py-4 text-center font-roboto max-h-[200px] overflow-y-auto ${currentTheme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
+                        {isLoadingLeaderboard ? (
+                            <div>Loading blockchain data...</div>
+                        ) : leaderboardData.length > 0 ? (
+                            <div className="space-y-3">
+                                {leaderboardData.map((item, i) => (
+                                    <div key={i} className={`flex justify-between items-center p-3 rounded-xl border ${currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10'}`}>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-sm font-bold opacity-50">#{item.tokenId}</span>
+                                            <span className="text-sm font-bold">{item.address}</span>
+                                        </div>
+                                        <div className="text-[#0000ff] font-black text-lg">LVL {item.level}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-sm opacity-70">No records found yet. Be the first!</div>
+                        )}
                     </div>
                     <button onClick={closeModal} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
                         Close
