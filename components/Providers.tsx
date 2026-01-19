@@ -2,19 +2,18 @@
 
 import { OnchainKitProvider } from '@coinbase/onchainkit';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { base } from 'viem/chains';
+import { base, baseSepolia } from 'viem/chains'; // Добавляем baseSepolia для тестов
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { coinbaseWallet } from 'wagmi/connectors';
 import { type ReactNode, useState } from 'react';
 
 export function Providers({ children }: { children: ReactNode }) {
-  // Create a new QueryClient instance
   const [queryClient] = useState(() => new QueryClient());
 
-  // Configure Wagmi with Coinbase Wallet and Base chain
   const [config] = useState(() =>
     createConfig({
-      chains: [base],
+      // ВАЖНО: Добавляем baseSepolia в список поддерживаемых сетей для тестирования
+      chains: [base, baseSepolia], 
       connectors: [
         coinbaseWallet({
           appName: 'Base Archery',
@@ -22,6 +21,7 @@ export function Providers({ children }: { children: ReactNode }) {
       ],
       transports: {
         [base.id]: http(),
+        [baseSepolia.id]: http(), // Транспорт для Sepolia
       },
     })
   );
@@ -30,7 +30,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <OnchainKitProvider
-          chain={base}
+          chain={base} // Для OnchainKit можно оставить base
         >
           {children}
         </OnchainKitProvider>

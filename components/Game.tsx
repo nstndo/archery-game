@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain } from 'wagmi';
 import { baseSepolia } from 'viem/chains'; // Используем тестовую сеть
 
 // --- ABI Смарт-контракта (Минимальный) ---
@@ -43,6 +43,8 @@ export default function Game() {
   const { address, isConnected } = useAccount();
   const { connectors, connect } = useConnect();
   const { disconnect } = useDisconnect();
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
   
   // Contract Hooks
   const { data: hash, isPending, writeContract } = useWriteContract();
@@ -388,8 +390,9 @@ export default function Game() {
         disconnect();
     } else {
         const coinbaseConnector = connectors.find((c) => c.id === 'coinbaseWalletSDK');
+        // Подключаемся с явным указанием сети Base Sepolia
         if (coinbaseConnector) {
-            connect({ connector: coinbaseConnector });
+            connect({ connector: coinbaseConnector, chainId: baseSepolia.id });
         }
     }
   };
@@ -411,6 +414,19 @@ export default function Game() {
     if (!isConnected) {
         handleConnect();
         return;
+    }
+
+    // Проверяем сеть перед минтом
+    if (chainId !== baseSepolia.id) {
+        try {
+            await switchChain({ chainId: baseSepolia.id });
+            // После смены сети пользователь должен нажать Mint еще раз, или можно вызвать автоматически,
+            // но лучше подождать завершения смены.
+            return;
+        } catch (error) {
+            console.error("Failed to switch chain", error);
+            return;
+        }
     }
     
     writeContract({
