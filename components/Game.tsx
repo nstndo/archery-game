@@ -93,7 +93,8 @@ export default function Game() {
 
     // Resize Handler with High DPI Support
     const handleResize = () => {
-      const parent = canvas.parentElement;
+      // Use containerRef for stable dimensions
+      const parent = containerRef.current;
       if (parent) {
         width = parent.clientWidth;
         height = parent.clientHeight;
@@ -115,6 +116,7 @@ export default function Game() {
     };
 
     window.addEventListener('resize', handleResize);
+    // Initial resize to set correct size immediately
     handleResize();
 
     // Helper: Draw Arrow
@@ -319,7 +321,8 @@ export default function Game() {
   // --- Actions ---
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeft <= 0) return;
-    const h = canvasRef.current?.clientHeight || window.innerHeight;
+    // Calculate start position relative to container height, which is stable now
+    const h = containerRef.current?.clientHeight || window.innerHeight;
     flyingArrow.current = { y: h * 0.82 };
   };
 
@@ -382,7 +385,8 @@ export default function Game() {
   return (
     <div 
         ref={containerRef}
-        className={`relative w-full h-full max-w-[480px] flex flex-col overflow-hidden transition-colors duration-300 ${currentTheme === 'light' ? 'bg-white text-black' : 'bg-[#000010] text-white'}`}
+        className={`fixed inset-0 w-full h-[100dvh] max-h-[100dvh] max-w-[480px] mx-auto flex flex-col overflow-hidden transition-colors duration-300 ${currentTheme === 'light' ? 'bg-white text-black' : 'bg-[#000010] text-white'}`}
+        style={{ touchAction: 'none' }} 
     >
       
       {/* Top Bar */}
@@ -510,7 +514,7 @@ export default function Game() {
                     </div>
                     <button onClick={closeModal} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
                         Close
-                    </button> 
+                    </button>
                 </>
             )}
 
