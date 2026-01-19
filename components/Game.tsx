@@ -23,6 +23,7 @@ const CONTRACT_ABI = [
   }
 ] as const;
 
+// Contract Address
 const CONTRACT_ADDRESS = "0xB84FC8E428DAFAeef8B577c72366ed651dD89e8d"; 
 
 // --- Types ---
@@ -158,9 +159,11 @@ export default function Game() {
       if (isStuck) {
         ctx.rotate(angle || 0);
         ctx.translate(targetRadius, 0);
+        
         ctx.beginPath();
         ctx.roundRect(0, -1.5, arrowLength, 3, 2);
         ctx.fill();
+
         ctx.beginPath();
         ctx.moveTo(-2, 0);
         ctx.lineTo(12, -7);
@@ -168,6 +171,7 @@ export default function Game() {
         ctx.lineTo(12, 7);
         ctx.closePath();
         ctx.fill();
+
         ctx.beginPath();
         const tailX = arrowLength;
         ctx.moveTo(tailX - 14, 0);
@@ -178,11 +182,14 @@ export default function Game() {
         ctx.lineTo(tailX, 8);
         ctx.closePath();
         ctx.fill();
+
       } else {
         ctx.translate(x, y);
+        
         ctx.beginPath();
         ctx.roundRect(-1.5, 0, 3, arrowLength, 2);
         ctx.fill();
+
         ctx.beginPath();
         ctx.moveTo(0, -2);
         ctx.lineTo(-7, 12);
@@ -190,6 +197,7 @@ export default function Game() {
         ctx.lineTo(7, 12);
         ctx.closePath();
         ctx.fill();
+
         ctx.beginPath();
         const tailY = arrowLength;
         ctx.moveTo(0, tailY - 14);
@@ -398,27 +406,27 @@ export default function Game() {
     setIsLoadingLeaderboard(true);
     
     try {
-        // 1. Получаем последние события Transfer (Mint)
-        // В реальном приложении лучше использовать The Graph или индексер
-        // Здесь мы просто берем последние логи
+        // Fetch logs
         const logs = await publicClient.getLogs({
             address: CONTRACT_ADDRESS,
             event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-            fromBlock: 'earliest', // В продакшене ограничить диапазон!
+            fromBlock: 'earliest',
             toBlock: 'latest'
         });
 
-        // Берем последние 5 минтов (обратный порядок)
         const recentLogs = logs.slice(-5).reverse();
         
         const data: LeaderboardEntry[] = [];
 
         for (const log of recentLogs) {
-            // @ts-ignore
-            const tokenId = log.args.tokenId;
-            const owner = log.args.to;
+            // Type assertion for logs to avoid TS error
+            const args = log.args as unknown as { tokenId?: bigint; to?: string };
+            const tokenId = args?.tokenId;
+            const owner = args?.to;
             
-            // Читаем tokenURI
+            if (tokenId === undefined) continue;
+
+            // Fetch Token URI
             try {
                 const tokenUri = await publicClient.readContract({
                     address: CONTRACT_ADDRESS,
@@ -427,12 +435,10 @@ export default function Game() {
                     args: [tokenId]
                 }) as string;
 
-                // Декодируем Base64 метаданные
                 if (tokenUri.startsWith('data:application/json;base64,')) {
                     const json = atob(tokenUri.split(',')[1]);
                     const metadata = JSON.parse(json);
                     
-                    // Ищем уровень в атрибутах
                     const levelAttr = metadata.attributes.find((a: any) => a.trait_type === 'Level');
                     
                     data.push({
@@ -459,7 +465,7 @@ export default function Game() {
     if (type === 'faq') setShowFaq(true);
     if (type === 'leaderboard') {
         setShowLeaderboard(true);
-        fetchLeaderboard(); // Загружаем данные при открытии
+        fetchLeaderboard();
     }
   };
 
