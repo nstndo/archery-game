@@ -510,7 +510,7 @@ export default function Game() {
                     </div>
                     <button onClick={closeModal} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
                         Close
-                    </button>
+                    </button> 
                 </>
             )}
 
