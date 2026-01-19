@@ -45,7 +45,7 @@ interface Particle {
 
 interface LeaderboardEntry {
     address: string;
-    level: string;
+    level: number; // Changed to number for sorting
     tokenId: string;
 }
 
@@ -412,12 +412,11 @@ export default function Game() {
     console.log("Fetching logs from:", CONTRACT_ADDRESS);
     
     try {
-        // Get current block number
         const blockNumber = await publicClient.getBlockNumber();
-        // Calculate fromBlock safely (e.g. 50000 blocks ago) to avoid RPC limit errors
         const fromBlock = blockNumber - BigInt(50000) > BigInt(0) ? blockNumber - BigInt(50000) : BigInt(0);
 
-        // Fetch logs with limited range
+        // Fetch logs (last 20 logs to save resources, but enough to show some variety)
+        // Note: For a real production app, use an indexer like The Graph.
         const logs = await publicClient.getLogs({
             address: CONTRACT_ADDRESS,
             event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
@@ -427,19 +426,19 @@ export default function Game() {
 
         console.log("Logs found:", logs.length);
 
-        const recentLogs = logs.slice(-5).reverse();
+        // Map to store best level per address
+        const bestScores = new Map<string, { level: number, tokenId: string }>();
         
-        const data: LeaderboardEntry[] = [];
+        // Process logs in reverse (newest first)
+        const recentLogs = logs.reverse().slice(0, 20); // Process last 20 logs
 
         for (const log of recentLogs) {
-            // Type assertion
             const args = log.args as { tokenId?: bigint; to?: string } | undefined;
-            if (!args || args.tokenId === undefined) continue;
+            if (!args || args.tokenId === undefined || !args.to) continue;
 
             const tokenId = args.tokenId;
             const owner = args.to;
             
-            // Fetch Token URI
             try {
                 const tokenUri = await publicClient.readContract({
                     address: CONTRACT_ADDRESS,
@@ -453,17 +452,27 @@ export default function Game() {
                     const metadata = JSON.parse(json);
                     
                     const levelAttr = metadata.attributes.find((a: any) => a.trait_type === 'Level');
-                    
-                    data.push({
-                        address: owner ? `${owner.slice(0,6)}...${owner.slice(-4)}` : 'Unknown',
-                        level: levelAttr ? levelAttr.value.toString() : '?',
-                        tokenId: tokenId.toString()
-                    });
+                    const currentLevel = levelAttr ? parseInt(levelAttr.value) : 0;
+
+                    // Update if this is a better score or new user
+                    const existing = bestScores.get(owner);
+                    if (!existing || currentLevel > existing.level) {
+                        bestScores.set(owner, { level: currentLevel, tokenId: tokenId.toString() });
+                    }
                 }
             } catch (e) {
                 console.error("Error fetching token", tokenId, e);
             }
         }
+        
+        // Convert map to array and sort by level descending
+        const data: LeaderboardEntry[] = Array.from(bestScores.entries())
+            .map(([address, info]) => ({
+                address: address,
+                level: info.level,
+                tokenId: info.tokenId
+            }))
+            .sort((a, b) => b.level - a.level);
         
         setLeaderboardData(data);
     } catch (e) {
@@ -564,9 +573,15 @@ export default function Game() {
       />
 
       <div className={`absolute top-0 left-0 w-full h-full bg-black/60 backdrop-blur-sm flex flex-col justify-end transition-opacity duration-300 z-20 ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-        <div className={`rounded-t-3xl p-6 pb-10 text-center transform transition-transform duration-300 border-t shadow-2xl ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'translate-y-0' : 'translate-y-full'} ${currentTheme === 'light' ? 'bg-white border-blue-100' : 'bg-[#1a1a1a] border-white/10'}`}>
+        <div className={`
+            text-center transform transition-transform duration-300 border-t shadow-2xl 
+            ${showLeaderboard ? 'h-full rounded-none pt-[calc(20px+env(safe-area-inset-top))]' : 'rounded-t-3xl p-6 pb-10'}
+            ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'translate-y-0' : 'translate-y-full'} 
+            ${currentTheme === 'light' ? 'bg-white border-blue-100' : 'bg-[#1a1a1a] border-white/10'}
+            flex flex-col
+        `}>
             
-            {isGameOver && (
+            {isGameOver && !showLeaderboard && (
                 <>
                     <h2 className={`font-orbitron text-2xl font-black mb-2 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>GAME OVER</h2>
                     <p className="font-orbitron text-sm text-gray-500 mb-6 tracking-wide">You hit another arrow!</p>
@@ -577,7 +592,7 @@ export default function Game() {
                         </div>
                     </div>
                     <button onClick={handleMint} disabled={isPending || isConfirming} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 mb-3 active:scale-98 transition-transform disabled:opacity-50 disabled:cursor-not-allowed`}>
-                        {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted!' : 'Mint Record NFT'}
+                        {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted! ✅' : 'Mint Record NFT'}
                     </button>
                     <button onClick={() => resetLevel(1)} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
                         Try Again
@@ -585,7 +600,7 @@ export default function Game() {
                 </>
             )}
 
-            {isLevelComplete && (
+            {isLevelComplete && !showLeaderboard && (
                 <>
                     <h2 className={`font-orbitron text-2xl font-black mb-2 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>LEVEL COMPLETE!</h2>
                     <p className="font-orbitron text-sm text-gray-500 mb-8 tracking-wide">Great shot! Ready for the next challenge?</p>
@@ -595,7 +610,7 @@ export default function Game() {
                 </>
             )}
 
-            {showFaq && (
+            {showFaq && !showLeaderboard && (
                 <>
                     <h2 className={`font-orbitron text-2xl font-black mb-6 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>GAME RULES</h2>
                     <div className={`text-left mb-6 text-sm font-roboto space-y-4 ${currentTheme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
@@ -615,36 +630,39 @@ export default function Game() {
             )}
 
             {showLeaderboard && (
-                <>
-                    <h2 className={`font-orbitron text-2xl font-black mb-6 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>RECENT CHAMPIONS</h2>
-                    <div className={`py-4 text-center font-roboto max-h-[200px] overflow-y-auto ${currentTheme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
+                <div className="flex flex-col h-full px-5 pb-5">
+                    <h2 className={`font-orbitron text-2xl font-black mb-6 uppercase flex-shrink-0 ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>LEADERBOARD</h2>
+                    <div className={`flex-1 overflow-y-auto mb-4 font-roboto text-left ${currentTheme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
                         {isLoadingLeaderboard ? (
-                            <div>Loading blockchain data...</div>
+                            <div className="text-center py-10">Loading blockchain data...</div>
                         ) : leaderboardData.length > 0 ? (
-                            <div className="space-y-3">
+                            <div className="space-y-2">
                                 {leaderboardData.map((item, i) => (
-                                    <div key={i} className={`flex justify-between items-center p-3 rounded-xl border ${currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10'}`}>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-sm font-bold opacity-50">#{item.tokenId}</span>
-                                            <span className="text-sm font-bold">{item.address}</span>
+                                    <div key={i} className={`flex justify-between items-center p-4 rounded-xl border ${currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10'}`}>
+                                        <div className="flex items-center gap-4">
+                                            <div className="text-lg font-black text-[#0000ff] w-6">#{i + 1}</div>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold">{item.address.slice(0, 6)}...{item.address.slice(-4)}</span>
+                                                <span className="text-xs opacity-50">Token ID: {item.tokenId}</span>
+                                            </div>
                                         </div>
-                                        <div className="text-[#0000ff] font-black text-lg">LVL {item.level}</div>
+                                        <div className="text-[#0000ff] font-black text-xl">LVL {item.level}</div>
                                     </div>
                                 ))}
                             </div>
                         ) : (
-                            <div className="text-sm opacity-70">No records found yet. Be the first!</div>
+                            <div className="text-center py-10 opacity-70">No records found yet. Be the first!</div>
                         )}
                     </div>
-                    <div className="flex gap-2">
-                        <button onClick={fetchLeaderboard} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
+                    <div className="flex gap-2 flex-shrink-0 mt-auto">
+                        <button onClick={fetchLeaderboard} className={`flex-1 p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
                             Refresh
                         </button>
-                        <button onClick={closeModal} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
+                        <button onClick={closeModal} className={`flex-1 p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
                             Close
                         </button>
                     </div>
-                </>
+                </div>
             )}
 
         </div>
