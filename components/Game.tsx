@@ -123,38 +123,71 @@ export default function Game() {
     const drawArrow = (x: number, y: number, angle?: number, isStuck = false) => {
       ctx.save();
       // Arrow color depends on theme
-      ctx.fillStyle = currentTheme === 'dark' ? '#ffffff' : '#0000ff';
-      ctx.shadowColor = 'rgba(0,0,0,0.3)';
-      ctx.shadowBlur = 4;
-
-      // Arrow Dimensions
-      const headLen = 20;
-      const headWidth = 12;
-      const shaftWidth = 3;
+      const color = currentTheme === 'dark' ? '#ffffff' : '#0000ff';
+      ctx.fillStyle = color;
+      
+      // Add a slight glow for a futuristic look
+      ctx.shadowColor = currentTheme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,255,0.4)';
+      ctx.shadowBlur = 8;
 
       if (isStuck) {
         ctx.rotate(angle || 0);
         ctx.translate(targetRadius, 0);
+        
+        // --- HORIZONTAL DESIGN (Stuck) ---
+        // 1. Shaft (Rounded body)
         ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(headLen, -headWidth / 2);
-        ctx.lineTo(headLen, -shaftWidth / 2);
-        ctx.lineTo(arrowLength, -shaftWidth / 2);
-        ctx.lineTo(arrowLength, shaftWidth / 2);
-        ctx.lineTo(headLen, shaftWidth / 2);
-        ctx.lineTo(headLen, headWidth / 2);
+        ctx.roundRect(0, -1.5, arrowLength, 3, 2);
+        ctx.fill();
+
+        // 2. Head (Spear shape)
+        ctx.beginPath();
+        ctx.moveTo(-2, 0); // Tip slightly inside for visual connection
+        ctx.lineTo(12, -7);
+        ctx.lineTo(8, 0);  // Indent
+        ctx.lineTo(12, 7);
         ctx.closePath();
         ctx.fill();
+
+        // 3. Tail (Stabilizers)
+        ctx.beginPath();
+        const tailX = arrowLength;
+        ctx.moveTo(tailX - 14, 0);
+        ctx.lineTo(tailX, -8); // Top wing back
+        ctx.lineTo(tailX + 2, -8); // Top wing edge
+        ctx.lineTo(tailX - 4, 0); // Center notch
+        ctx.lineTo(tailX + 2, 8); // Bottom wing edge
+        ctx.lineTo(tailX, 8); // Bottom wing back
+        ctx.closePath();
+        ctx.fill();
+
       } else {
         ctx.translate(x, y);
+        
+        // --- VERTICAL DESIGN (Flying) ---
+        // 1. Shaft
         ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(-headWidth / 2, headLen);
-        ctx.lineTo(-shaftWidth / 2, headLen);
-        ctx.lineTo(-shaftWidth / 2, arrowLength);
-        ctx.lineTo(shaftWidth / 2, arrowLength);
-        ctx.lineTo(shaftWidth / 2, headLen);
-        ctx.lineTo(headWidth / 2, headLen);
+        ctx.roundRect(-1.5, 0, 3, arrowLength, 2);
+        ctx.fill();
+
+        // 2. Head
+        ctx.beginPath();
+        ctx.moveTo(0, -2); // Tip
+        ctx.lineTo(-7, 12);
+        ctx.lineTo(0, 8);  // Indent
+        ctx.lineTo(7, 12);
+        ctx.closePath();
+        ctx.fill();
+
+        // 3. Tail
+        ctx.beginPath();
+        const tailY = arrowLength;
+        ctx.moveTo(0, tailY - 14);
+        ctx.lineTo(-8, tailY);
+        ctx.lineTo(-8, tailY + 2);
+        ctx.lineTo(0, tailY - 4);
+        ctx.lineTo(8, tailY + 2);
+        ctx.lineTo(8, tailY);
         ctx.closePath();
         ctx.fill();
       }
