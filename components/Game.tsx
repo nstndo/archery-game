@@ -34,7 +34,7 @@ const CONTRACT_ABI = [
   }
 ] as const;
 
-const CONTRACT_ADDRESS = "0x9a622811d534321d6fdcf0920ee92b3d01dfef79"; 
+const CONTRACT_ADDRESS = "0xda82ee50ba87f970077cd282390318337d658a26"; 
 
 interface Arrow {
   angle: number;
