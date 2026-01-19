@@ -263,7 +263,8 @@ export default function Game() {
 
         // Flying Arrow Logic
         if (flyingArrow.current) {
-            flyingArrow.current.y -= 25;
+            // Speed increased from 25 to 40
+            flyingArrow.current.y -= 40;
             const impactY = centerY + targetRadius;
 
             if (flyingArrow.current.y <= impactY) {
