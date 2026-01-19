@@ -95,6 +95,7 @@ export default function Game() {
     shardAse_Blue: null as HTMLImageElement | null,
   });
 
+  // Init Assets
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const loadImg = (src: string) => {
@@ -110,6 +111,7 @@ export default function Game() {
     assets.current.shardAse_Blue = loadImg('https://base-archery-game.vercel.app/ase-blue.webp');
   }, []);
 
+  // Main Game Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -410,11 +412,16 @@ export default function Game() {
     console.log("Fetching logs from:", CONTRACT_ADDRESS);
     
     try {
-        // Fetch logs
+        // Get current block number
+        const blockNumber = await publicClient.getBlockNumber();
+        // Calculate fromBlock safely (e.g. 50000 blocks ago) to avoid RPC limit errors
+        const fromBlock = blockNumber - 50000n > 0n ? blockNumber - 50000n : 0n;
+
+        // Fetch logs with limited range
         const logs = await publicClient.getLogs({
             address: CONTRACT_ADDRESS,
             event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-            fromBlock: 'earliest',
+            fromBlock: fromBlock,
             toBlock: 'latest'
         });
 
@@ -425,10 +432,8 @@ export default function Game() {
         const data: LeaderboardEntry[] = [];
 
         for (const log of recentLogs) {
-            // Type assertion for logs
+            // Type assertion
             const args = log.args as { tokenId?: bigint; to?: string } | undefined;
-            
-            // Check if args or tokenId is undefined to satisfy TypeScript strict mode
             if (!args || args.tokenId === undefined) continue;
 
             const tokenId = args.tokenId;
@@ -572,7 +577,7 @@ export default function Game() {
                         </div>
                     </div>
                     <button onClick={handleMint} disabled={isPending || isConfirming} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 mb-3 active:scale-98 transition-transform disabled:opacity-50 disabled:cursor-not-allowed`}>
-                        {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted!' : 'Mint Record NFT'}
+                        {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted! ✅' : 'Mint Record NFT'}
                     </button>
                     <button onClick={() => resetLevel(1)} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
                         Try Again
