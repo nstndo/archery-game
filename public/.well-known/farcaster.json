@@ -12,7 +12,7 @@
     "imageUrl": "https://base-archery-game.vercel.app/opengraph-image.png",
     "buttonTitle": "Play Archery",
     "splashImageUrl": "https://base-archery-game.vercel.app/splash.png",
-    "splashBackgroundColor": "#000010",
+    "splashBackgroundColor": "#ffffff",
     "webhookUrl": "https://base-archery-game.vercel.app/api/webhook"
   }
 }
