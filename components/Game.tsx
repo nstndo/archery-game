@@ -100,6 +100,9 @@ export default function Game() {
   
   // Theme State
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
+  
+  // State for SDK readiness
+  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
 
   // Game Logic Refs
   const gameState = useRef<'playing' | 'gameover' | 'level_complete' | 'paused'>('playing');
@@ -125,8 +128,10 @@ export default function Game() {
     const initSDK = async () => {
         try {
             await sdk.actions.ready();
+            setIsSDKLoaded(true);
         } catch (err) {
             console.warn("Failed to initialize Base App SDK:", err);
+            setIsSDKLoaded(false);
         }
     };
     initSDK();
@@ -520,11 +525,22 @@ export default function Game() {
 
   // --- SHARE FUNCTION ---
   const handleShare = () => {
-    const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`;
-    const embed = 'https://base-archery-game.vercel.app'; 
-    const shareUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(embed)}`;
+    const text = encodeURIComponent(`I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`);
+    const embed = encodeURIComponent('https://base-archery-game.vercel.app'); 
+    const shareUrl = `https://warpcast.com/~/compose?text=${text}&embeds[]=${embed}`;
     
-    sdk.actions.openUrl(shareUrl);
+    // 1. Try SDK if loaded
+    if (isSDKLoaded && sdk.actions && sdk.actions.openUrl) {
+        try {
+            sdk.actions.openUrl(shareUrl);
+            return;
+        } catch (e) {
+            console.warn("SDK openUrl failed, falling back", e);
+        }
+    }
+
+    // 2. Fallback for browser / failures
+    window.open(shareUrl, '_blank');
   };
 
   return (
