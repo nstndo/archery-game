@@ -36,7 +36,7 @@ const CONTRACT_ABI = [
 ] as const;
 
 // ADDRESS
-const CONTRACT_ADDRESS = "0x63f22c06cd7054c2d9c3e65d1321826b180f5354"; 
+const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9"; 
 
 // --- Types ---
 interface Arrow {
