@@ -5,7 +5,10 @@ import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTran
 import { base } from 'viem/chains';
 import { parseAbiItem } from 'viem';
 import sdk, { type FrameContext } from '@farcaster/frame-sdk';
+// Import Identity components for displaying names and avatars (Basenames/ENS)
+import { Avatar, Name, Identity, Badge } from '@coinbase/onchainkit/identity';
 
+// --- Smart Contract ABI ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -34,7 +37,7 @@ const CONTRACT_ABI = [
   }
 ] as const;
 
-// ADDRESS
+// CONTRACT ADDRESS
 const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9"; 
 
 // --- Types ---
@@ -73,11 +76,11 @@ export default function Game() {
   const { switchChain } = useSwitchChain();
   const publicClient = usePublicClient();
   
-  // Mint Hooks
+  // Hooks for contract write (Mint)
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
 
-  // Leaderboard Read Hook
+  // Leaderboard Read Hook (In MAINNET)
   const { data: rawLeaderboard, refetch: refetchLeaderboard, isLoading: isReadingLeaderboard } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
@@ -132,7 +135,7 @@ export default function Game() {
             await sdk.actions.ready();
             setIsSDKLoaded(true);
         } catch (err) {
-            console.warn("Failed to initialize Base App SDK:", err);
+            // Silently fail if not in Frame environment
         }
     };
     initSDK();
@@ -159,6 +162,7 @@ export default function Game() {
   // Leaderboard Data Processing
   useEffect(() => {
     if (rawLeaderboard) {
+        // Format data as needed
         const formatted: LeaderboardEntry[] = (rawLeaderboard as any[]).map((item) => ({
             address: item.wallet,
             level: Number(item.maxLevel),
@@ -166,13 +170,14 @@ export default function Game() {
             isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
         }));
         
+        // Sort by level descending
         formatted.sort((a, b) => b.level - a.level);
         setLeaderboardData(formatted);
         setIsLoadingLeaderboard(false);
     }
   }, [rawLeaderboard, address]);
 
-  // Main Game Loop (Skipped detailing loop code to focus on fixes, it remains same as previous working version)
+  // Main Game Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -194,13 +199,16 @@ export default function Game() {
         width = window.innerWidth;
         height = window.innerHeight;
       }
+      
       const dpr = window.devicePixelRatio || 1;
       canvas.width = width * dpr;
       canvas.height = height * dpr;
+      
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
+
       targetRadius = width < 380 ? 80 : 90;
     };
 
@@ -313,6 +321,7 @@ export default function Game() {
       const centerY = height * 0.35;
       const startArrowY = height * 0.82;
 
+      // 1. Draw Target
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(rotation.current);
@@ -327,6 +336,7 @@ export default function Game() {
         ctx.lineWidth = 2;
         ctx.stroke();
       } else {
+        // Fallback target
         ctx.beginPath();
         ctx.arc(0, 0, targetRadius, 0, Math.PI * 2);
         ctx.fillStyle = '#0000ff';
@@ -334,14 +344,17 @@ export default function Game() {
       }
       ctx.restore();
 
+      // 2. Draw Stuck Arrows
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(rotation.current);
       stuckArrows.current.forEach(a => drawArrow(0, 0, a.angle, true));
       ctx.restore();
 
+      // 3. Particles (Always update)
       updateAndDrawParticles();
 
+      // 4. Game Physics (Only when playing)
       if (gameState.current === 'playing') {
         rotationChangeTimer.current--;
         if (rotationChangeTimer.current <= 0) {
@@ -354,6 +367,7 @@ export default function Game() {
         rotation.current += currentSpeed.current;
 
         if (flyingArrow.current) {
+            // Speed increased
             flyingArrow.current.y -= 40;
             const impactY = centerY + targetRadius;
 
@@ -362,11 +376,13 @@ export default function Game() {
                 let hitAngle = (Math.PI / 2) - rotation.current;
                 hitAngle = hitAngle % (Math.PI * 2);
                 if (hitAngle < 0) hitAngle += Math.PI * 2;
+
                 const collision = stuckArrows.current.some(a => {
                     let diff = Math.abs(a.angle - hitAngle);
                     if (diff > Math.PI) diff = (Math.PI * 2) - diff;
                     return diff < 0.04; 
                 });
+
                 if (collision) {
                     gameState.current = 'gameover';
                     setIsGameOver(true);
@@ -387,14 +403,18 @@ export default function Game() {
         }
       }
 
+      // 5. Draw Active/Ready Arrow
       if (flyingArrow.current) {
         drawArrow(centerX, flyingArrow.current.y);
       } else if (arrowsLeft > 0 && gameState.current === 'playing') {
         drawArrow(centerX, startArrowY);
       }
+
       animationFrameId = requestAnimationFrame(loop);
     };
+
     loop();
+
     return () => {
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(animationFrameId);
@@ -435,14 +455,23 @@ export default function Game() {
     else document.body.classList.remove('dark-mode');
   };
 
+  // Connect Handler
   const handleConnect = () => {
     if (isConnected) {
         disconnect();
     } else {
-        const injected = connectors.find(c => c.type === 'injected');
-        const coinbase = connectors.find(c => c.id === 'coinbaseWalletSDK');
-        const connector = injected || coinbase || connectors[0];
-        if (connector) connect({ connector });
+        // Logic for selecting connector:
+        // 1. Search for 'injected' (for embedded wallet browsers)
+        // 2. Then 'coinbaseWalletSDK'
+        // 3. Or take the first available
+        
+        const connector = connectors.find((c) => c.id === 'injected') ||
+                          connectors.find((c) => c.id === 'coinbaseWalletSDK') ||
+                          connectors[0];
+
+        if (connector) {
+            connect({ connector });
+        }
     }
   };
 
@@ -494,41 +523,29 @@ export default function Game() {
     });
   };
 
-  // --- UPDATED SHARE FUNCTION (WEB SHARE API) ---
-  const handleShare = async () => {
-    const shareData = {
-        title: 'Base Archery',
-        text: `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`,
-        url: 'https://base-archery-game.vercel.app'
-    };
-
-    // 1. Try Native Web Share (Works great in Mobile Base App / Safari / Chrome)
-    if (typeof navigator !== 'undefined' && navigator.share) {
-        try {
-            await navigator.share(shareData);
-            return;
-        } catch (err) {
-            console.log("Web Share cancelled/failed, trying fallback");
-        }
-    }
-
-    // 2. Fallback: Farcaster SDK (if available)
-    const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(shareData.text)}&embeds[]=${encodeURIComponent(shareData.url)}`;
+  // --- SHARE FUNCTION ---
+  const handleShare = () => {
+    const text = encodeURIComponent(`I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`);
+    const embed = encodeURIComponent('https://base-archery-game.vercel.app'); 
+    const shareUrl = `https://warpcast.com/~/compose?text=${text}&embeds[]=${embed}`;
+    
+    // 1. Try SDK if loaded (works inside Farcaster/Base App)
     if (isSDKLoaded && sdk.actions && sdk.actions.openUrl) {
         try {
-            sdk.actions.openUrl(warpcastUrl);
+            sdk.actions.openUrl(shareUrl);
             return;
         } catch (e) {
-            console.warn("SDK openUrl failed", e);
+            console.warn("SDK openUrl failed, falling back", e);
         }
     }
 
-    // 3. Ultimate Fallback: New Window
-    window.open(warpcastUrl, '_blank');
+    // 2. Fallback for browser (works on desktop/mobile browser)
+    window.open(shareUrl, '_blank');
   };
 
   // --- RENDER PROFILE ---
   const renderProfile = () => {
+    // 1. Try Frame Context User
     if (frameContext?.user) {
         return (
             <div className="flex items-center gap-3 bg-opacity-20 bg-white px-4 py-1.5 rounded-2xl border border-white/20">
@@ -539,25 +556,38 @@ export default function Game() {
                         className="w-6 h-6 rounded-full border border-white/30"
                     />
                 )}
-                <span className={`font-bold text-sm tracking-wide ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>
+                <span className={`font-bold text-sm tracking-wide truncate max-w-[120px] ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>
                     {frameContext.user.username}
                 </span>
             </div>
         );
     }
+    
+    // 2. Try Wallet Connection with OnchainKit Identity
+    if (isConnected && address) {
+        return (
+            <div className="flex items-center gap-2 bg-opacity-10 bg-gray-500 px-3 py-1.5 rounded-2xl border border-current text-current">
+                <Identity
+                    address={address}
+                    schemaId="0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9"
+                >
+                    <Avatar className="w-5 h-5 rounded-full" />
+                    <Name className={`font-bold text-xs tracking-wide ${currentTheme === 'light' ? 'text-black' : 'text-white'}`} />
+                </Identity>
+            </div>
+        );
+    }
+
+    // 3. Fallback Connect Button
     return (
         <button 
             type="button"
             onClick={handleConnect}
             className={`px-4 py-2 rounded-2xl font-bold text-xs tracking-widest font-orbitron transition-all active:scale-95 ${
-                isConnected 
-                ? 'bg-[#0000ff] text-white border-transparent' 
-                : (currentTheme === 'light' ? 'bg-gray-100 text-black border-blue-600/10' : 'bg-white/10 text-white border-white/20')
+                currentTheme === 'light' ? 'bg-gray-100 text-black border-blue-600/10' : 'bg-white/10 text-white border-white/20'
             } border`}
         >
-            {isConnected 
-                ? `${address?.slice(0, 4)}...${address?.slice(-4)}` 
-                : 'CONNECT'}
+            CONNECT
         </button>
     );
   };
@@ -586,16 +616,23 @@ export default function Game() {
         </div>
       </div>
 
-      {/* Stats & Icons Overlay */}
       <div className="absolute top-[calc(70px+env(safe-area-inset-top))] w-full flex justify-center items-center gap-4 z-10 pointer-events-none px-5">
-        <button type="button" onClick={() => openModal('leaderboard')} className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}>
+        <button 
+            type="button"
+            onClick={() => openModal('leaderboard')}
+            className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
+        >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
         </button>
         <div className={`px-5 py-2 rounded-2xl border backdrop-blur-sm text-center min-w-[120px] ${currentTheme === 'light' ? 'bg-blue-50/80 border-blue-200' : 'bg-black/50 border-white/10'}`}>
             <div className="text-base font-bold tracking-widest font-orbitron">LEVEL {level}</div>
             <div className="text-sm font-bold text-[#0000ff] font-orbitron">{arrowsLeft} ARROWS</div>
         </div>
-        <button type="button" onClick={() => openModal('faq')} className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}>
+        <button 
+            type="button"
+            onClick={() => openModal('faq')}
+            className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
+        >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
         </button>
       </div>
@@ -606,16 +643,15 @@ export default function Game() {
         onPointerDown={handlePointerDown}
       />
 
-      {/* Modals Overlay - Updated Logic for Leaderboard */}
       <div className={`absolute top-0 left-0 w-full h-full bg-black/60 backdrop-blur-sm flex flex-col justify-end transition-opacity duration-300 z-20 ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <div className={`
             text-center transform transition-transform duration-300 border-t shadow-2xl 
-            ${showLeaderboard ? 'h-full pt-[calc(20px+env(safe-area-inset-top))] rounded-none' : 'rounded-t-3xl p-6 pb-10'}
+            ${showLeaderboard ? 'h-full pt-[calc(20px+env(safe-area-inset-top))] rounded-none justify-start' : 'rounded-t-3xl p-6 pb-10 justify-end'}
             ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'translate-y-0' : 'translate-y-full'} 
             ${currentTheme === 'light' ? 'bg-white border-blue-100' : 'bg-[#1a1a1a] border-white/10'}
             flex flex-col w-full
         `}>
-            {/* Added logic specifically for Leaderboard Full Height Fix */}
+            
             {showLeaderboard && (
                 <div className="flex flex-col h-full px-5 pb-5">
                     <h2 className={`font-orbitron text-2xl font-black mb-6 uppercase flex-shrink-0 ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>LEADERBOARD</h2>
@@ -625,17 +661,16 @@ export default function Game() {
                         ) : leaderboardData.length > 0 ? (
                             <div className="space-y-2">
                                 {leaderboardData.map((item, i) => (
-                                    <div key={i} className={`flex justify-between items-center p-4 rounded-xl border ${currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10'}`}>
+                                    <div key={i} className={`flex justify-between items-center p-3 rounded-xl border ${currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10'}`}>
                                         <div className="flex items-center gap-4">
                                             <div className="text-lg font-black text-[#0000ff] w-6">#{i + 1}</div>
                                             <div className="flex flex-col">
-                                                {/* Use Username if available (Current User), else Short Address */}
-                                                <span className={`text-sm font-bold ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`}>
-                                                  {item.isCurrentUser && frameContext?.user?.username 
-                                                    ? frameContext.user.username 
-                                                    : `${item.address.slice(0, 6)}...${item.address.slice(-4)}`
-                                                  }
-                                                </span>
+                                                <div className={`text-sm font-bold flex items-center gap-2 ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`}>
+                                                    <Identity address={item.address as `0x${string}`} schemaId="0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9">
+                                                        <Avatar className="w-5 h-5 rounded-full" />
+                                                        <Name />
+                                                    </Identity>
+                                                </div>
                                                 <span className="text-xs opacity-50">Token ID: {item.tokenId}</span>
                                             </div>
                                         </div>
@@ -658,7 +693,6 @@ export default function Game() {
                 </div>
             )}
 
-            {/* Other Modals (Game Over, etc) - No changes */}
             {!showLeaderboard && (
                 <>
                     {isGameOver && (
@@ -723,6 +757,7 @@ export default function Game() {
 
         </div>
       </div>
+
     </div>
   );
 }
