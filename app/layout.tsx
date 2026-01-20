@@ -21,6 +21,11 @@ const APP_URL = "https://base-archery-game.vercel.app";
 export const metadata: Metadata = {
   title: "Base Archery",
   description: "Compete in the Base Archery Tournament. Mint your score as NFT on Base.",
+  icons: {
+    icon: 'https://base-archery-game.vercel.app/favicon.svg',
+    shortcut: 'https://base-archery-game.vercel.app/favicon.svg',
+    apple: 'https://base-archery-game.vercel.app/favicon.svg',
+  },
   openGraph: {
     title: "Base Archery",
     description: "Compete in the Base Archery Tournament.",
@@ -37,8 +42,8 @@ export const metadata: Metadata = {
           type: "launch_frame",
           name: "Base Archery",
           url: APP_URL,
-          splashImageUrl: `${APP_URL}/splash.png`,
-          splashBackgroundColor: "#ffffff"
+          splashImageUrl: `${APP_URL}/base-logo.png`,
+          splashBackgroundColor: "#000010"
         }
       }
     }),
