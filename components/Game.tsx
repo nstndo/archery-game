@@ -1,12 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient, useReadContract } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
 import { base } from 'viem/chains';
-import { parseAbiItem } from 'viem';
 import sdk, { type FrameContext } from '@farcaster/frame-sdk';
-// Import Identity components for displaying names and avatars (Basenames/ENS)
-import { Avatar, Name, Identity, Badge } from '@coinbase/onchainkit/identity';
+// Using only specific components or raw data to avoid default styling issues
+import { Avatar, Name } from '@coinbase/onchainkit/identity';
 
 // --- Smart Contract ABI ---
 const CONTRACT_ABI = [
@@ -80,17 +79,6 @@ export default function Game() {
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
 
-  // Leaderboard Read Hook (In MAINNET)
-  const { data: rawLeaderboard, refetch: refetchLeaderboard, isLoading: isReadingLeaderboard } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: 'getLeaderboard',
-    chainId: base.id, 
-    query: {
-        enabled: false, 
-    }
-  });
-
   // UI State
   const [level, setLevel] = useState(1);
   const [arrowsLeft, setArrowsLeft] = useState(10);
@@ -159,24 +147,6 @@ export default function Game() {
     assets.current.shardAse_Blue = loadImg('https://base-archery-game.vercel.app/ase-blue.webp');
   }, []);
 
-  // Leaderboard Data Processing
-  useEffect(() => {
-    if (rawLeaderboard) {
-        // Format data as needed
-        const formatted: LeaderboardEntry[] = (rawLeaderboard as any[]).map((item) => ({
-            address: item.wallet,
-            level: Number(item.maxLevel),
-            tokenId: item.tokenId.toString(),
-            isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
-        }));
-        
-        // Sort by level descending
-        formatted.sort((a, b) => b.level - a.level);
-        setLeaderboardData(formatted);
-        setIsLoadingLeaderboard(false);
-    }
-  }, [rawLeaderboard, address]);
-
   // Main Game Loop
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -221,15 +191,19 @@ export default function Game() {
       ctx.fillStyle = color;
       ctx.shadowColor = currentTheme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,255,0.4)';
       ctx.shadowBlur = 8;
+
       const headLen = 20;
       const headWidth = 12;
       const shaftWidth = 3;
+
       if (isStuck) {
         ctx.rotate(angle || 0);
         ctx.translate(targetRadius, 0);
+        
         ctx.beginPath();
         ctx.roundRect(0, -1.5, arrowLength, 3, 2);
         ctx.fill();
+
         ctx.beginPath();
         ctx.moveTo(-2, 0);
         ctx.lineTo(12, -7);
@@ -237,6 +211,7 @@ export default function Game() {
         ctx.lineTo(12, 7);
         ctx.closePath();
         ctx.fill();
+
         ctx.beginPath();
         const tailX = arrowLength;
         ctx.moveTo(tailX - 14, 0);
@@ -247,11 +222,14 @@ export default function Game() {
         ctx.lineTo(tailX, 8);
         ctx.closePath();
         ctx.fill();
+
       } else {
         ctx.translate(x, y);
+        
         ctx.beginPath();
         ctx.roundRect(-1.5, 0, 3, arrowLength, 2);
         ctx.fill();
+
         ctx.beginPath();
         ctx.moveTo(0, -2);
         ctx.lineTo(-7, 12);
@@ -259,6 +237,7 @@ export default function Game() {
         ctx.lineTo(7, 12);
         ctx.closePath();
         ctx.fill();
+
         ctx.beginPath();
         const tailY = arrowLength;
         ctx.moveTo(0, tailY - 14);
@@ -276,6 +255,7 @@ export default function Game() {
     const spawnHitParticles = (x: number, y: number) => {
       const bImg = currentTheme === 'dark' ? assets.current.shardB : assets.current.shardB_Blue;
       const aseImg = currentTheme === 'dark' ? assets.current.shardAse : assets.current.shardAse_Blue;
+
       if (bImg) particles.current.push(createParticle(x, y, bImg, 24));
       if (aseImg) {
         for (let i = 0; i < 3; i++) particles.current.push(createParticle(x, y, aseImg, 18));
@@ -367,7 +347,7 @@ export default function Game() {
         rotation.current += currentSpeed.current;
 
         if (flyingArrow.current) {
-            // Speed increased
+            // Speed increased from 25 to 40
             flyingArrow.current.y -= 40;
             const impactY = centerY + targetRadius;
 
@@ -437,6 +417,7 @@ export default function Game() {
 
   const resetLevel = (lvl: number) => {
     if (resetContract) resetContract(); 
+    
     setLevel(lvl);
     setArrowsLeft(10);
     stuckArrows.current = [];
@@ -455,23 +436,14 @@ export default function Game() {
     else document.body.classList.remove('dark-mode');
   };
 
-  // Connect Handler
   const handleConnect = () => {
     if (isConnected) {
         disconnect();
     } else {
-        // Logic for selecting connector:
-        // 1. Search for 'injected' (for embedded wallet browsers)
-        // 2. Then 'coinbaseWalletSDK'
-        // 3. Or take the first available
-        
-        const connector = connectors.find((c) => c.id === 'injected') ||
-                          connectors.find((c) => c.id === 'coinbaseWalletSDK') ||
-                          connectors[0];
-
-        if (connector) {
-            connect({ connector });
-        }
+        const injected = connectors.find((c) => c.type === 'injected');
+        const coinbase = connectors.find((c) => c.id === 'coinbaseWalletSDK');
+        const connector = injected || coinbase || connectors[0];
+        if (connector) connect({ connector });
     }
   };
 
@@ -481,12 +453,34 @@ export default function Game() {
     if (gameState.current === 'paused') gameState.current = 'playing';
   };
 
+  // --- DIRECT LEADERBOARD FETCH ---
+  // Using publicClient.readContract instead of hook to force fresh data
   const fetchLeaderboard = async () => {
+    if (!publicClient) return;
+    
     setIsLoadingLeaderboard(true);
+    setLeaderboardData([]); // Clear old data visually
+    
     try {
-        await refetchLeaderboard();
+        // Direct call bypassing Wagmi hook cache
+        const data = await publicClient.readContract({
+            address: CONTRACT_ADDRESS,
+            abi: CONTRACT_ABI,
+            functionName: 'getLeaderboard',
+        }) as any[];
+
+        const formatted: LeaderboardEntry[] = data.map((item) => ({
+            address: item.wallet,
+            level: Number(item.maxLevel),
+            tokenId: item.tokenId.toString(),
+            isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
+        }));
+        
+        formatted.sort((a, b) => b.level - a.level);
+        setLeaderboardData(formatted);
     } catch (e) {
         console.error("Fetch leaderboard error", e);
+    } finally {
         setIsLoadingLeaderboard(false);
     }
   };
@@ -523,62 +517,53 @@ export default function Game() {
     });
   };
 
-  // --- SHARE FUNCTION ---
   const handleShare = () => {
     const text = encodeURIComponent(`I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`);
     const embed = encodeURIComponent('https://base-archery-game.vercel.app'); 
     const shareUrl = `https://warpcast.com/~/compose?text=${text}&embeds[]=${embed}`;
     
-    // 1. Try SDK if loaded (works inside Farcaster/Base App)
     if (isSDKLoaded && sdk.actions && sdk.actions.openUrl) {
         try {
             sdk.actions.openUrl(shareUrl);
             return;
         } catch (e) {
-            console.warn("SDK openUrl failed, falling back", e);
+            console.warn("SDK openUrl failed", e);
         }
     }
-
-    // 2. Fallback for browser (works on desktop/mobile browser)
     window.open(shareUrl, '_blank');
   };
 
-  // --- RENDER PROFILE ---
+  // --- RENDER PROFILE (Fixed Width) ---
   const renderProfile = () => {
-    // 1. Try Frame Context User
     if (frameContext?.user) {
         return (
-            <div className="flex items-center gap-3 bg-opacity-20 bg-white px-4 py-1.5 rounded-2xl border border-white/20">
+            <div className="flex items-center gap-3 bg-opacity-20 bg-white px-3 py-1.5 rounded-2xl border border-white/20 max-w-[150px]">
                 {frameContext.user.pfpUrl && (
                     <img 
                         src={frameContext.user.pfpUrl} 
                         alt="Profile" 
-                        className="w-6 h-6 rounded-full border border-white/30"
+                        className="w-6 h-6 rounded-full border border-white/30 flex-shrink-0"
                     />
                 )}
-                <span className={`font-bold text-sm tracking-wide truncate max-w-[120px] ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>
+                <span className={`font-bold text-sm tracking-wide truncate ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>
                     {frameContext.user.username}
                 </span>
             </div>
         );
     }
     
-    // 2. Try Wallet Connection with OnchainKit Identity
     if (isConnected && address) {
         return (
-            <div className="flex items-center gap-2 bg-opacity-10 bg-gray-500 px-3 py-1.5 rounded-2xl border border-current text-current">
-                <Identity
-                    address={address}
-                    schemaId="0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9"
-                >
-                    <Avatar className="w-5 h-5 rounded-full" />
-                    <Name className={`font-bold text-xs tracking-wide ${currentTheme === 'light' ? 'text-black' : 'text-white'}`} />
-                </Identity>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border border-current max-w-[140px] ${currentTheme === 'light' ? 'bg-gray-100 text-black border-blue-600/10' : 'bg-white/10 text-white border-white/20'}`}>
+                {/* Manual simple avatar placeholder */}
+                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex-shrink-0" />
+                <span className="font-bold text-xs tracking-wide truncate">
+                    {address.slice(0, 4)}...{address.slice(-4)}
+                </span>
             </div>
         );
     }
 
-    // 3. Fallback Connect Button
     return (
         <button 
             type="button"
@@ -595,91 +580,82 @@ export default function Game() {
   return (
     <div 
         ref={containerRef}
-        className={`fixed inset-0 w-full h-[100dvh] max-h-[100dvh] max-w-[480px] mx-auto flex flex-col overflow-hidden transition-colors duration-300 ${currentTheme === 'light' ? 'bg-white text-black' : 'bg-[#000010] text-white'}`}
+        className={`fixed inset-0 w-full h-[100dvh] max-h-[100dvh] max-w-[480px] mx-auto flex flex-col overflow-hidden transition-colors duration-300 shadow-2xl ${currentTheme === 'light' ? 'bg-white text-black' : 'bg-[#000010] text-white'}`}
         style={{ touchAction: 'none' }} 
     >
       
       {/* Top Bar */}
-      <div className={`flex justify-between items-center px-5 py-4 pt-[calc(15px+env(safe-area-inset-top))] backdrop-blur-md z-10 border-b transition-colors duration-300 ${currentTheme === 'light' ? 'bg-white/85 border-blue-600/10' : 'bg-[#000020]/85 border-white/10'}`}>
-        <div className="font-orbitron font-black text-xl flex items-center gap-2 uppercase tracking-wide">
+      <div className={`flex justify-between items-center px-4 py-4 pt-[calc(15px+env(safe-area-inset-top))] backdrop-blur-md z-10 border-b transition-colors duration-300 flex-shrink-0 ${currentTheme === 'light' ? 'bg-white/85 border-blue-600/10' : 'bg-[#000020]/85 border-white/10'}`}>
+        <div className="font-orbitron font-black text-lg flex items-center gap-2 uppercase tracking-wide flex-shrink-0">
           BASE <span className="text-[#0000ff]">ARCHERY</span>
         </div>
-        <div className="flex gap-3 items-center">
-            <button onClick={toggleTheme} className="p-1 hover:opacity-70 transition-opacity">
+        <div className="flex gap-2 items-center flex-shrink-0 min-w-0">
+            <button onClick={toggleTheme} className="p-1.5 hover:opacity-70 transition-opacity">
                 {currentTheme === 'dark' ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
                 ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
                 )}
             </button>
             {renderProfile()}
         </div>
       </div>
 
+      {/* Stats & Icons Overlay */}
       <div className="absolute top-[calc(70px+env(safe-area-inset-top))] w-full flex justify-center items-center gap-4 z-10 pointer-events-none px-5">
-        <button 
-            type="button"
-            onClick={() => openModal('leaderboard')}
-            className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
-        >
+        <button type="button" onClick={() => openModal('leaderboard')} className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
         </button>
         <div className={`px-5 py-2 rounded-2xl border backdrop-blur-sm text-center min-w-[120px] ${currentTheme === 'light' ? 'bg-blue-50/80 border-blue-200' : 'bg-black/50 border-white/10'}`}>
             <div className="text-base font-bold tracking-widest font-orbitron">LEVEL {level}</div>
             <div className="text-sm font-bold text-[#0000ff] font-orbitron">{arrowsLeft} ARROWS</div>
         </div>
-        <button 
-            type="button"
-            onClick={() => openModal('faq')}
-            className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
-        >
+        <button type="button" onClick={() => openModal('faq')} className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
         </button>
       </div>
 
-      <canvas 
-        ref={canvasRef} 
-        className="block w-full h-full touch-none select-none"
-        onPointerDown={handlePointerDown}
-      />
+      <canvas ref={canvasRef} className="block w-full h-full touch-none select-none" onPointerDown={handlePointerDown} />
 
       <div className={`absolute top-0 left-0 w-full h-full bg-black/60 backdrop-blur-sm flex flex-col justify-end transition-opacity duration-300 z-20 ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        
+        {/* Leaderboard - Full Screen logic applied here */}
         <div className={`
-            text-center transform transition-transform duration-300 border-t shadow-2xl 
-            ${showLeaderboard ? 'h-full pt-[calc(20px+env(safe-area-inset-top))] rounded-none justify-start' : 'rounded-t-3xl p-6 pb-10 justify-end'}
+            transform transition-transform duration-300 border-t shadow-2xl flex flex-col w-full
+            ${showLeaderboard ? 'h-full rounded-none pt-[calc(15px+env(safe-area-inset-top))]' : 'rounded-t-3xl p-6 pb-10'}
             ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'translate-y-0' : 'translate-y-full'} 
             ${currentTheme === 'light' ? 'bg-white border-blue-100' : 'bg-[#1a1a1a] border-white/10'}
-            flex flex-col w-full
         `}>
             
             {showLeaderboard && (
-                <div className="flex flex-col h-full px-5 pb-5">
-                    <h2 className={`font-orbitron text-2xl font-black mb-6 uppercase flex-shrink-0 ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>LEADERBOARD</h2>
+                <div className="flex flex-col h-full px-5 pb-8">
+                    <h2 className={`font-orbitron text-2xl font-black mb-4 uppercase flex-shrink-0 text-center ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>LEADERBOARD</h2>
+                    
                     <div className={`flex-1 overflow-y-auto mb-4 font-roboto text-left ${currentTheme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
                         {isLoadingLeaderboard ? (
-                            <div className="text-center py-10">Loading blockchain data...</div>
+                            <div className="flex justify-center items-center h-full">
+                                <div className="text-sm font-bold opacity-60 animate-pulse">LOADING...</div>
+                            </div>
                         ) : leaderboardData.length > 0 ? (
                             <div className="space-y-2">
                                 {leaderboardData.map((item, i) => (
-                                    <div key={i} className={`flex justify-between items-center p-3 rounded-xl border ${currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10'}`}>
-                                        <div className="flex items-center gap-4">
-                                            <div className="text-lg font-black text-[#0000ff] w-6">#{i + 1}</div>
-                                            <div className="flex flex-col">
-                                                <div className={`text-sm font-bold flex items-center gap-2 ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`}>
-                                                    <Identity address={item.address as `0x${string}`} schemaId="0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9">
-                                                        <Avatar className="w-5 h-5 rounded-full" />
-                                                        <Name />
-                                                    </Identity>
-                                                </div>
-                                                <span className="text-xs opacity-50">Token ID: {item.tokenId}</span>
+                                    <div key={i} className={`flex justify-between items-center p-3 rounded-xl border ${item.isCurrentUser ? 'border-[#0000ff] bg-blue-500/10' : (currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10')}`}>
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-lg font-black text-[#0000ff] w-6 flex-shrink-0">#{i + 1}</div>
+                                            <div className="flex flex-col overflow-hidden">
+                                                <span className={`text-sm font-bold truncate ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`}>
+                                                  {/* Show 'You' for current user, otherwise short address */}
+                                                  {item.isCurrentUser ? 'YOU' : `${item.address.slice(0, 6)}...${item.address.slice(-4)}`}
+                                                </span>
+                                                <span className="text-[10px] opacity-50 uppercase">Token #{item.tokenId}</span>
                                             </div>
                                         </div>
-                                        <div className="text-[#0000ff] font-black text-xl">LVL {item.level}</div>
+                                        <div className="text-[#0000ff] font-black text-xl flex-shrink-0">LVL {item.level}</div>
                                     </div>
                                 ))}
                             </div>
                         ) : (
-                            <div className="text-center py-10 opacity-70">No records found yet. Be the first!</div>
+                            <div className="text-center py-10 opacity-70">No champions yet.</div>
                         )}
                     </div>
                     <div className="flex gap-2 flex-shrink-0 mt-auto">
@@ -694,7 +670,7 @@ export default function Game() {
             )}
 
             {!showLeaderboard && (
-                <>
+                <div className="text-center"> 
                     {isGameOver && (
                         <>
                             <h2 className={`font-orbitron text-2xl font-black mb-2 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>GAME OVER</h2>
@@ -705,16 +681,11 @@ export default function Game() {
                                     <div className="text-3xl font-black text-[#0000ff]">{level}</div>
                                 </div>
                             </div>
-
                             {isConfirmed && (
-                                <button 
-                                    onClick={handleShare}
-                                    className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 mb-3 active:scale-98 transition-transform`}
-                                >
+                                <button onClick={handleShare} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 mb-3 active:scale-98 transition-transform`}>
                                     SHARE ACHIEVEMENT
                                 </button>
                             )}
-
                             <button onClick={handleMint} disabled={isPending || isConfirming || isConfirmed} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest ${isConfirmed ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-[#0000ff] text-white shadow-lg shadow-blue-600/30'} mb-3 active:scale-98 transition-transform disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none border border-transparent`}>
                                 {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted Successfully' : 'Mint Record NFT'}
                             </button>
@@ -752,7 +723,7 @@ export default function Game() {
                             </button>
                         </>
                     )}
-                </>
+                </div>
             )}
 
         </div>
