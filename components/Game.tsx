@@ -6,7 +6,7 @@ import { base } from 'viem/chains';
 import { parseAbiItem } from 'viem';
 import sdk from '@farcaster/frame-sdk';
 
-// --- ABI Смарт-контракта ---
+// --- Smart Contract ABI ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -35,10 +35,10 @@ const CONTRACT_ABI = [
   }
 ] as const;
 
-// АДРЕС ВАШЕГО КОНТРАКТА В MAINNET
+// YOUR MAINNET CONTRACT ADDRESS
 const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9"; 
 
-// --- Типы ---
+// --- Types ---
 interface Arrow {
   angle: number;
 }
@@ -466,23 +466,34 @@ export default function Game() {
     else document.body.classList.remove('dark-mode');
   };
 
+  // UPDATED CONNECT HANDLER FOR WARPCAST/INJECTED WALLETS
   const handleConnect = () => {
     if (isConnected) {
         disconnect();
     } else {
-        // Logic for selecting connector:
-        // 1. Search for 'injected' (for embedded wallet browsers like Farcaster, MetaMask)
-        // 2. Then 'coinbaseWalletSDK'
-        // 3. Or take the first available
-        
-        const injectedConnector = connectors.find((c) => c.id === 'injected');
-        const coinbaseConnector = connectors.find((c) => c.id === 'coinbaseWalletSDK');
-        
-        const connector = injectedConnector || coinbaseConnector || connectors[0];
-
-        if (connector) {
-            connect({ connector });
+        // Priority 1: Check for 'injected' (Warpcast internal wallet usually maps here)
+        const injected = connectors.find(c => c.id === 'injected');
+        if (injected) {
+            connect({ connector: injected });
+            return;
         }
+
+        // Priority 2: Check for any connector with type 'injected' (EIP-6963)
+        const anyInjected = connectors.find(c => c.type === 'injected');
+        if (anyInjected) {
+             connect({ connector: anyInjected });
+             return;
+        }
+        
+        // Priority 3: Coinbase Wallet
+        const coinbase = connectors.find(c => c.id === 'coinbaseWalletSDK');
+        if (coinbase) {
+            connect({ connector: coinbase });
+            return;
+        }
+        
+        // Fallback: First available
+        if (connectors.length > 0) connect({ connector: connectors[0] });
     }
   };
 
