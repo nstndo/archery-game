@@ -6,6 +6,7 @@ import { base } from 'viem/chains';
 import { parseAbiItem } from 'viem';
 import sdk from '@farcaster/frame-sdk';
 
+// --- ABI Смарт-контракта ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -34,8 +35,10 @@ const CONTRACT_ABI = [
   }
 ] as const;
 
+// АДРЕС ВАШЕГО КОНТРАКТА В MAINNET
 const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9"; 
 
+// --- Типы ---
 interface Arrow {
   angle: number;
 }
@@ -70,16 +73,18 @@ export default function Game() {
   const { switchChain } = useSwitchChain();
   const publicClient = usePublicClient();
   
+  // Hooks for contract write (Mint)
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
 
+  // Hook for reading Leaderboard (In MAINNET)
   const { data: rawLeaderboard, refetch: refetchLeaderboard, isLoading: isReadingLeaderboard } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: 'getLeaderboard',
-    chainId: base.id,
+    chainId: base.id, // Using Base Mainnet
     query: {
-        enabled: false,
+        enabled: false, // Do not fetch automatically on start
     }
   });
 
@@ -132,7 +137,7 @@ export default function Game() {
     initSDK();
   }, []);
 
-  // Init Assets
+  // Assets Init
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -153,12 +158,14 @@ export default function Game() {
   // Leaderboard Data Processing
   useEffect(() => {
     if (rawLeaderboard) {
+        // Format data as needed
         const formatted: LeaderboardEntry[] = (rawLeaderboard as any[]).map((item) => ({
             address: item.wallet,
             level: Number(item.maxLevel),
             tokenId: item.tokenId.toString()
         }));
         
+        // Sort by level descending
         formatted.sort((a, b) => b.level - a.level);
         
         setLeaderboardData(formatted);
@@ -320,6 +327,7 @@ export default function Game() {
       const centerY = height * 0.35;
       const startArrowY = height * 0.82;
 
+      // 1. Draw Target
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(rotation.current);
@@ -334,6 +342,7 @@ export default function Game() {
         ctx.lineWidth = 2;
         ctx.stroke();
       } else {
+        // Fallback target
         ctx.beginPath();
         ctx.arc(0, 0, targetRadius, 0, Math.PI * 2);
         ctx.fillStyle = '#0000ff';
@@ -341,15 +350,19 @@ export default function Game() {
       }
       ctx.restore();
 
+      // 2. Draw Stuck Arrows
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(rotation.current);
       stuckArrows.current.forEach(a => drawArrow(0, 0, a.angle, true));
       ctx.restore();
 
+      // 3. Particles (Always update)
       updateAndDrawParticles();
 
+      // 4. Game Physics (Only when playing)
       if (gameState.current === 'playing') {
+        // Rotation Logic
         rotationChangeTimer.current--;
         if (rotationChangeTimer.current <= 0) {
             rotationChangeTimer.current = 60 + Math.random() * 120;
@@ -360,7 +373,9 @@ export default function Game() {
         currentSpeed.current += (targetSpeed.current - currentSpeed.current) * 0.03;
         rotation.current += currentSpeed.current;
 
+        // Flying Arrow Logic
         if (flyingArrow.current) {
+            // Speed increased from 25 to 40
             flyingArrow.current.y -= 40;
             const impactY = centerY + targetRadius;
 
@@ -383,6 +398,8 @@ export default function Game() {
                     stuckArrows.current.push({ angle: hitAngle });
                     flyingArrow.current = null;
                     spawnHitParticles(centerX, impactY);
+                    
+                    // React State Update for UI
                     setArrowsLeft(prev => {
                         const newVal = prev - 1;
                         if (newVal <= 0) {
@@ -396,6 +413,7 @@ export default function Game() {
         }
       }
 
+      // 5. Draw Active/Ready Arrow
       if (flyingArrow.current) {
         drawArrow(centerX, flyingArrow.current.y);
       } else if (arrowsLeft > 0 && gameState.current === 'playing') {
@@ -413,6 +431,7 @@ export default function Game() {
     };
   }, [level, arrowsLeft, currentTheme]);
 
+  // --- Actions ---
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeft <= 0) return;
     const h = containerRef.current?.clientHeight || window.innerHeight;
@@ -451,13 +470,17 @@ export default function Game() {
     if (isConnected) {
         disconnect();
     } else {
+        // Logic for selecting connector:
+        // 1. Search for 'injected' (for embedded wallet browsers like Farcaster, MetaMask)
+        // 2. Then 'coinbaseWalletSDK'
+        // 3. Or take the first available
         
-        const connector = connectors.find((c) => c.id === 'injected') ||
-                          connectors.find((c) => c.id === 'coinbaseWalletSDK') ||
-                          connectors[0];
+        const injectedConnector = connectors.find((c) => c.id === 'injected');
+        const coinbaseConnector = connectors.find((c) => c.id === 'coinbaseWalletSDK');
+        
+        const connector = injectedConnector || coinbaseConnector || connectors[0];
 
         if (connector) {
-
             connect({ connector });
         }
     }
@@ -511,12 +534,13 @@ export default function Game() {
     });
   };
 
-  // --- SHARE FUNCTION (STANDARD) ---
+  // --- SHARE FUNCTION ---
   const handleShare = () => {
     const text = encodeURIComponent(`I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`);
     const embed = encodeURIComponent('https://base-archery-game.vercel.app'); 
     const shareUrl = `https://warpcast.com/~/compose?text=${text}&embeds[]=${embed}`;
     
+    // 1. Try SDK if loaded (works inside Farcaster/Base App)
     if (isSDKLoaded && sdk.actions && sdk.actions.openUrl) {
         try {
             sdk.actions.openUrl(shareUrl);
@@ -526,6 +550,7 @@ export default function Game() {
         }
     }
 
+    // 2. Fallback for browser (works on desktop/mobile browser)
     window.open(shareUrl, '_blank');
   };
 
