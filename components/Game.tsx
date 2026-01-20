@@ -6,7 +6,6 @@ import { base } from 'viem/chains';
 import { parseAbiItem } from 'viem';
 import sdk from '@farcaster/frame-sdk';
 
-// --- ABI ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -35,10 +34,8 @@ const CONTRACT_ABI = [
   }
 ] as const;
 
-// MAINNET CA
 const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9"; 
 
-// --- Types ---
 interface Arrow {
   angle: number;
 }
@@ -73,18 +70,16 @@ export default function Game() {
   const { switchChain } = useSwitchChain();
   const publicClient = usePublicClient();
   
-  // Hooks for contract writing (Mint)
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
 
-  // Hook for reading Leaderboard (In MAINNET)
   const { data: rawLeaderboard, refetch: refetchLeaderboard, isLoading: isReadingLeaderboard } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: 'getLeaderboard',
-    chainId: base.id, // Using Base Mainnet
+    chainId: base.id,
     query: {
-        enabled: false, // Не загружать автоматически при старте
+        enabled: false,
     }
   });
 
@@ -456,13 +451,14 @@ export default function Game() {
     if (isConnected) {
         disconnect();
     } else {
-        // Try injected first, then Coinbase
+        
         const connector = connectors.find((c) => c.id === 'injected') ||
                           connectors.find((c) => c.id === 'coinbaseWalletSDK') ||
                           connectors[0];
 
         if (connector) {
-            connect({ connector, chainId: base.id });
+
+            connect({ connector });
         }
     }
   };
@@ -515,13 +511,12 @@ export default function Game() {
     });
   };
 
-  // --- SHARE FUNCTION (FIXED) ---
+  // --- SHARE FUNCTION (STANDARD) ---
   const handleShare = () => {
     const text = encodeURIComponent(`I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`);
     const embed = encodeURIComponent('https://base-archery-game.vercel.app'); 
     const shareUrl = `https://warpcast.com/~/compose?text=${text}&embeds[]=${embed}`;
     
-    // 1. Try SDK if loaded (works inside Farcaster/Base App)
     if (isSDKLoaded && sdk.actions && sdk.actions.openUrl) {
         try {
             sdk.actions.openUrl(shareUrl);
@@ -531,7 +526,6 @@ export default function Game() {
         }
     }
 
-    // 2. Fallback for browser (works on desktop/mobile browser)
     window.open(shareUrl, '_blank');
   };
 
@@ -554,6 +548,7 @@ export default function Game() {
                 )}
             </button>
             <button 
+                type="button"
                 onClick={handleConnect}
                 className={`px-4 py-2 rounded-2xl font-bold text-xs tracking-widest font-orbitron transition-all active:scale-95 ${
                     isConnected 
@@ -570,6 +565,7 @@ export default function Game() {
 
       <div className="absolute top-[calc(70px+env(safe-area-inset-top))] w-full flex justify-center items-center gap-4 z-10 pointer-events-none px-5">
         <button 
+            type="button"
             onClick={() => openModal('leaderboard')}
             className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
         >
@@ -580,6 +576,7 @@ export default function Game() {
             <div className="text-sm font-bold text-[#0000ff] font-orbitron">{arrowsLeft} ARROWS</div>
         </div>
         <button 
+            type="button"
             onClick={() => openModal('faq')}
             className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
         >
