@@ -4,9 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient, useReadContract } from 'wagmi';
 import { base } from 'viem/chains';
 import { parseAbiItem } from 'viem';
-import sdk from '@farcaster/frame-sdk';
+import sdk, { type FrameContext } from '@farcaster/frame-sdk';
 
-// --- Smart Contract ABI ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -35,7 +34,7 @@ const CONTRACT_ABI = [
   }
 ] as const;
 
-// YOUR MAINNET CONTRACT ADDRESS
+// ADDRESS
 const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9"; 
 
 // --- Types ---
@@ -59,6 +58,7 @@ interface LeaderboardEntry {
     address: string;
     level: number;
     tokenId: string;
+    isCurrentUser: boolean; // Flag to identify current user in list
 }
 
 export default function Game() {
@@ -73,18 +73,18 @@ export default function Game() {
   const { switchChain } = useSwitchChain();
   const publicClient = usePublicClient();
   
-  // Hooks for contract write (Mint)
+  // Mint Hooks
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
 
-  // Hook for reading Leaderboard (In MAINNET)
+  // Leaderboard Read Hook
   const { data: rawLeaderboard, refetch: refetchLeaderboard, isLoading: isReadingLeaderboard } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: 'getLeaderboard',
-    chainId: base.id, // Using Base Mainnet
+    chainId: base.id, 
     query: {
-        enabled: false, // Do not fetch automatically on start
+        enabled: false, 
     }
   });
 
@@ -101,7 +101,8 @@ export default function Game() {
   // Theme State
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
   
-  // State for SDK readiness
+  // Farcaster/Base App Context State
+  const [frameContext, setFrameContext] = useState<FrameContext | null>(null);
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
 
   // Game Logic Refs
@@ -123,15 +124,19 @@ export default function Game() {
     shardAse_Blue: null as HTMLImageElement | null,
   });
 
-  // Base App SDK Init
+  // Base App SDK & Context Init
   useEffect(() => {
     const initSDK = async () => {
         try {
+            // Load context (user profile)
+            const context = await sdk.context;
+            setFrameContext(context);
+            
+            // Notify that frame is ready
             await sdk.actions.ready();
             setIsSDKLoaded(true);
         } catch (err) {
             console.warn("Failed to initialize Base App SDK:", err);
-            setIsSDKLoaded(false);
         }
     };
     initSDK();
@@ -158,20 +163,20 @@ export default function Game() {
   // Leaderboard Data Processing
   useEffect(() => {
     if (rawLeaderboard) {
-        // Format data as needed
         const formatted: LeaderboardEntry[] = (rawLeaderboard as any[]).map((item) => ({
             address: item.wallet,
             level: Number(item.maxLevel),
-            tokenId: item.tokenId.toString()
+            tokenId: item.tokenId.toString(),
+            // Check if this entry belongs to current connected wallet
+            isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
         }));
         
-        // Sort by level descending
         formatted.sort((a, b) => b.level - a.level);
         
         setLeaderboardData(formatted);
         setIsLoadingLeaderboard(false);
     }
-  }, [rawLeaderboard]);
+  }, [rawLeaderboard, address]);
 
   // Main Game Loop
   useEffect(() => {
@@ -362,7 +367,6 @@ export default function Game() {
 
       // 4. Game Physics (Only when playing)
       if (gameState.current === 'playing') {
-        // Rotation Logic
         rotationChangeTimer.current--;
         if (rotationChangeTimer.current <= 0) {
             rotationChangeTimer.current = 60 + Math.random() * 120;
@@ -373,9 +377,7 @@ export default function Game() {
         currentSpeed.current += (targetSpeed.current - currentSpeed.current) * 0.03;
         rotation.current += currentSpeed.current;
 
-        // Flying Arrow Logic
         if (flyingArrow.current) {
-            // Speed increased from 25 to 40
             flyingArrow.current.y -= 40;
             const impactY = centerY + targetRadius;
 
@@ -399,7 +401,6 @@ export default function Game() {
                     flyingArrow.current = null;
                     spawnHitParticles(centerX, impactY);
                     
-                    // React State Update for UI
                     setArrowsLeft(prev => {
                         const newVal = prev - 1;
                         if (newVal <= 0) {
@@ -431,7 +432,6 @@ export default function Game() {
     };
   }, [level, arrowsLeft, currentTheme]);
 
-  // --- Actions ---
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeft <= 0) return;
     const h = containerRef.current?.clientHeight || window.innerHeight;
@@ -466,34 +466,24 @@ export default function Game() {
     else document.body.classList.remove('dark-mode');
   };
 
-  // UPDATED CONNECT HANDLER FOR INJECTED WALLETS
+  // UPDATED CONNECT HANDLER FOR INJECTED WALLETS (AGAIN)
   const handleConnect = () => {
     if (isConnected) {
         disconnect();
     } else {
-        console.log("Connecting... Available connectors:", connectors.map(c => c.id));
+        // Just try to connect with the first available connector, or specifically look for Injected
+        // This is usually what Farcaster expects
         
-        // 1. Try generic 'injected' (Standard for WebView wallets like Warpcast)
-        const injected = connectors.find(c => c.id === 'injected');
-        if (injected) {
-            connect({ connector: injected });
-            return;
-        }
-
-        // 2. Try any connector that looks like injected (fallback)
-        // Many wallets use different IDs but set type to 'injected'
-        const anyInjected = connectors.find(c => c.type === 'injected');
-        if (anyInjected) {
-             connect({ connector: anyInjected });
-             return;
-        }
+        // Priority 1: EIP-6963 Injected Provider (Warpcast wallet often appears here)
+        const injected = connectors.find(c => c.type === 'injected');
         
-        // 3. Fallback to Coinbase or First available
+        // Priority 2: Coinbase Wallet
         const coinbase = connectors.find(c => c.id === 'coinbaseWalletSDK');
-        const fallback = coinbase || connectors[0];
+        
+        const connector = injected || coinbase || connectors[0];
 
-        if (fallback) {
-            connect({ connector: fallback });
+        if (connector) {
+            connect({ connector });
         }
     }
   };
@@ -528,10 +518,12 @@ export default function Game() {
         handleConnect();
         return;
     }
+    // We check chainId but we don't block. We request switch.
     if (chainId !== base.id) {
         try {
             await switchChain({ chainId: base.id });
-            return;
+            // Wait a bit? Or just let user click again.
+            return; 
         } catch (error) {
             console.error("Failed to switch chain", error);
             return;
@@ -546,24 +538,64 @@ export default function Game() {
     });
   };
 
-  // --- SHARE FUNCTION ---
+  // --- SHARE FUNCTION (FIXED FOR BASE APP) ---
   const handleShare = () => {
     const text = encodeURIComponent(`I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`);
     const embed = encodeURIComponent('https://base-archery-game.vercel.app'); 
+    
+    // Create the compose URL for Warpcast
     const shareUrl = `https://warpcast.com/~/compose?text=${text}&embeds[]=${embed}`;
     
-    // 1. Try SDK if loaded (works inside Farcaster/Base App)
+    // Use SDK to open URL natively
     if (isSDKLoaded && sdk.actions && sdk.actions.openUrl) {
         try {
             sdk.actions.openUrl(shareUrl);
             return;
         } catch (e) {
-            console.warn("SDK openUrl failed, falling back", e);
+            console.warn("SDK openUrl failed", e);
         }
     }
 
-    // 2. Fallback for browser (works on desktop/mobile browser)
+    // Fallback
     window.open(shareUrl, '_blank');
+  };
+
+  // --- RENDER HEADER PROFILE ---
+  const renderProfile = () => {
+    // If we have Farcaster context, display username
+    if (frameContext?.user) {
+        return (
+            <div className="flex items-center gap-3 bg-opacity-20 bg-white px-4 py-1.5 rounded-2xl border border-white/20">
+                {frameContext.user.pfpUrl && (
+                    <img 
+                        src={frameContext.user.pfpUrl} 
+                        alt="Profile" 
+                        className="w-6 h-6 rounded-full border border-white/30"
+                    />
+                )}
+                <span className={`font-bold text-sm tracking-wide ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>
+                    {frameContext.user.username}
+                </span>
+            </div>
+        );
+    }
+
+    // Fallback to Wallet Address if connected but no Farcaster profile
+    return (
+        <button 
+            type="button"
+            onClick={handleConnect}
+            className={`px-4 py-2 rounded-2xl font-bold text-xs tracking-widest font-orbitron transition-all active:scale-95 ${
+                isConnected 
+                ? 'bg-[#0000ff] text-white border-transparent' 
+                : (currentTheme === 'light' ? 'bg-gray-100 text-black border-blue-600/10' : 'bg-white/10 text-white border-white/20')
+            } border`}
+        >
+            {isConnected 
+                ? `${address?.slice(0, 4)}...${address?.slice(-4)}` 
+                : 'CONNECT'}
+        </button>
+    );
   };
 
   return (
@@ -572,6 +604,8 @@ export default function Game() {
         className={`fixed inset-0 w-full h-[100dvh] max-h-[100dvh] max-w-[480px] mx-auto flex flex-col overflow-hidden transition-colors duration-300 ${currentTheme === 'light' ? 'bg-white text-black' : 'bg-[#000010] text-white'}`}
         style={{ touchAction: 'none' }} 
     >
+      
+      {/* Top Bar */}
       <div className={`flex justify-between items-center px-5 py-4 pt-[calc(15px+env(safe-area-inset-top))] backdrop-blur-md z-10 border-b transition-colors duration-300 ${currentTheme === 'light' ? 'bg-white/85 border-blue-600/10' : 'bg-[#000020]/85 border-white/10'}`}>
         <div className="font-orbitron font-black text-xl flex items-center gap-2 uppercase tracking-wide">
           BASE <span className="text-[#0000ff]">ARCHERY</span>
@@ -584,23 +618,16 @@ export default function Game() {
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
                 )}
             </button>
-            <button 
-                type="button"
-                onClick={handleConnect}
-                className={`px-4 py-2 rounded-2xl font-bold text-xs tracking-widest font-orbitron transition-all active:scale-95 ${
-                    isConnected 
-                    ? 'bg-[#0000ff] text-white border-transparent' 
-                    : (currentTheme === 'light' ? 'bg-gray-100 text-black border-blue-600/10' : 'bg-white/10 text-white border-white/20')
-                } border`}
-            >
-            {isConnected 
-                ? `${address?.slice(0, 4)}...${address?.slice(-4)}` 
-                : 'CONNECT'}
-            </button>
+            
+            {/* Render Profile or Connect Button */}
+            {renderProfile()}
         </div>
       </div>
 
+      {/* Stats & Icons Overlay */}
       <div className="absolute top-[calc(70px+env(safe-area-inset-top))] w-full flex justify-center items-center gap-4 z-10 pointer-events-none px-5">
+        
+        {/* Leaderboard Button */}
         <button 
             type="button"
             onClick={() => openModal('leaderboard')}
@@ -608,10 +635,14 @@ export default function Game() {
         >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
         </button>
+        
+        {/* Level Badge */}
         <div className={`px-5 py-2 rounded-2xl border backdrop-blur-sm text-center min-w-[120px] ${currentTheme === 'light' ? 'bg-blue-50/80 border-blue-200' : 'bg-black/50 border-white/10'}`}>
             <div className="text-base font-bold tracking-widest font-orbitron">LEVEL {level}</div>
             <div className="text-sm font-bold text-[#0000ff] font-orbitron">{arrowsLeft} ARROWS</div>
         </div>
+
+        {/* FAQ Button */}
         <button 
             type="button"
             onClick={() => openModal('faq')}
@@ -627,19 +658,16 @@ export default function Game() {
         onPointerDown={handlePointerDown}
       />
 
+      {/* Modals Overlay */}
       <div className={`absolute top-0 left-0 w-full h-full bg-black/60 backdrop-blur-sm flex flex-col justify-end transition-opacity duration-300 z-20 ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-        <div className={`
-            text-center transform transition-transform duration-300 border-t shadow-2xl 
-            ${showLeaderboard ? 'h-full rounded-none pt-[calc(20px+env(safe-area-inset-top))]' : 'rounded-t-3xl p-6 pb-10'}
-            ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'translate-y-0' : 'translate-y-full'} 
-            ${currentTheme === 'light' ? 'bg-white border-blue-100' : 'bg-[#1a1a1a] border-white/10'}
-            flex flex-col
-        `}>
+        
+        <div className={`rounded-t-3xl p-6 pb-10 text-center transform transition-transform duration-300 border-t shadow-2xl ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'translate-y-0' : 'translate-y-full'} ${currentTheme === 'light' ? 'bg-white border-blue-100' : 'bg-[#1a1a1a] border-white/10'}`}>
             
-            {isGameOver && !showLeaderboard && (
+            {isGameOver && (
                 <>
                     <h2 className={`font-orbitron text-2xl font-black mb-2 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>GAME OVER</h2>
                     <p className="font-orbitron text-sm text-gray-500 mb-6 tracking-wide">You hit another arrow!</p>
+                    
                     <div className={`rounded-2xl p-5 mb-6 border flex justify-center items-center ${currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-[#252525] border-white/5'}`}>
                         <div className="text-center">
                             <div className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Level Reached</div>
@@ -672,7 +700,7 @@ export default function Game() {
                 </>
             )}
 
-            {isLevelComplete && !showLeaderboard && (
+            {isLevelComplete && (
                 <>
                     <h2 className={`font-orbitron text-2xl font-black mb-2 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>LEVEL COMPLETE!</h2>
                     <p className="font-orbitron text-sm text-gray-500 mb-8 tracking-wide">Great shot! Ready for the next challenge?</p>
@@ -682,7 +710,7 @@ export default function Game() {
                 </>
             )}
 
-            {showFaq && !showLeaderboard && (
+            {showFaq && (
                 <>
                     <h2 className={`font-orbitron text-2xl font-black mb-6 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>GAME RULES</h2>
                     <div className={`text-left mb-6 text-sm font-roboto space-y-4 ${currentTheme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
@@ -714,7 +742,13 @@ export default function Game() {
                                         <div className="flex items-center gap-4">
                                             <div className="text-lg font-black text-[#0000ff] w-6">#{i + 1}</div>
                                             <div className="flex flex-col">
-                                                <span className="text-sm font-bold">{item.address.slice(0, 6)}...{item.address.slice(-4)}</span>
+                                                {/* Use username if current user or if we could map it (mocked here) */}
+                                                <span className="text-sm font-bold">
+                                                  {item.isCurrentUser && frameContext?.user?.username 
+                                                    ? frameContext.user.username 
+                                                    : `${item.address.slice(0, 6)}...${item.address.slice(-4)}`
+                                                  }
+                                                </span>
                                                 <span className="text-xs opacity-50">Token ID: {item.tokenId}</span>
                                             </div>
                                         </div>
