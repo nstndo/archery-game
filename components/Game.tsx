@@ -5,10 +5,8 @@ import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTran
 import { base } from 'viem/chains';
 import { parseAbiItem } from 'viem';
 import sdk from '@farcaster/frame-sdk';
-// Import hook for sharing according to Base App docs
-import { useComposeCast } from '@coinbase/onchainkit/minikit';
 
-// --- Smart Contract ABI (Includes getLeaderboard) ---
+// --- ABI ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -37,7 +35,7 @@ const CONTRACT_ABI = [
   }
 ] as const;
 
-// YOUR MAINNET CONTRACT ADDRESS
+// MAINNET CA
 const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9"; 
 
 // --- Types ---
@@ -86,12 +84,9 @@ export default function Game() {
     functionName: 'getLeaderboard',
     chainId: base.id, // Using Base Mainnet
     query: {
-        enabled: false, // Do not fetch automatically on start
+        enabled: false, // Не загружать автоматически при старте
     }
   });
-
-  // Base App Share Hook
-  const { composeCast } = useComposeCast();
 
   // UI State
   const [level, setLevel] = useState(1);
@@ -142,15 +137,17 @@ export default function Game() {
     initSDK();
   }, []);
 
-  // Assets Init
+  // Init Assets
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
     const loadImg = (src: string) => {
       const img = new Image();
       img.crossOrigin = "Anonymous";
       img.src = src;
       return img;
     };
+
     assets.current.target = loadImg('https://base-archery-game.vercel.app/base-logo.webp');
     assets.current.shardB = loadImg('https://base-archery-game.vercel.app/b-white.webp');
     assets.current.shardAse = loadImg('https://base-archery-game.vercel.app/ase-white.webp');
@@ -161,14 +158,12 @@ export default function Game() {
   // Leaderboard Data Processing
   useEffect(() => {
     if (rawLeaderboard) {
-        // Format data as needed
         const formatted: LeaderboardEntry[] = (rawLeaderboard as any[]).map((item) => ({
             address: item.wallet,
             level: Number(item.maxLevel),
             tokenId: item.tokenId.toString()
         }));
         
-        // Sort by level descending
         formatted.sort((a, b) => b.level - a.level);
         
         setLeaderboardData(formatted);
@@ -284,6 +279,7 @@ export default function Game() {
     const spawnHitParticles = (x: number, y: number) => {
       const bImg = currentTheme === 'dark' ? assets.current.shardB : assets.current.shardB_Blue;
       const aseImg = currentTheme === 'dark' ? assets.current.shardAse : assets.current.shardAse_Blue;
+
       if (bImg) particles.current.push(createParticle(x, y, bImg, 24));
       if (aseImg) {
         for (let i = 0; i < 3; i++) particles.current.push(createParticle(x, y, aseImg, 18));
@@ -460,11 +456,11 @@ export default function Game() {
     if (isConnected) {
         disconnect();
     } else {
-        // Find available connector: prioritize Injected (MetaMask etc), then Coinbase, or fallback to first available
-        const connector = connectors.find((c) => c.id === 'injected' || c.id === 'metaMask') ||
+        // Try injected first, then Coinbase
+        const connector = connectors.find((c) => c.id === 'injected') ||
                           connectors.find((c) => c.id === 'coinbaseWalletSDK') ||
                           connectors[0];
-                          
+
         if (connector) {
             connect({ connector, chainId: base.id });
         }
@@ -519,13 +515,13 @@ export default function Game() {
     });
   };
 
-  // --- SHARE FUNCTION ---
+  // --- SHARE FUNCTION (FIXED) ---
   const handleShare = () => {
     const text = encodeURIComponent(`I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`);
     const embed = encodeURIComponent('https://base-archery-game.vercel.app'); 
     const shareUrl = `https://warpcast.com/~/compose?text=${text}&embeds[]=${embed}`;
     
-    // 1. Try SDK if loaded
+    // 1. Try SDK if loaded (works inside Farcaster/Base App)
     if (isSDKLoaded && sdk.actions && sdk.actions.openUrl) {
         try {
             sdk.actions.openUrl(shareUrl);
@@ -535,7 +531,7 @@ export default function Game() {
         }
     }
 
-    // 2. Fallback for browser / failures
+    // 2. Fallback for browser (works on desktop/mobile browser)
     window.open(shareUrl, '_blank');
   };
 
