@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient, useReadContract } from 'wagmi';
 import { base } from 'viem/chains';
+import { parseAbiItem } from 'viem';
 import sdk, { type FrameContext } from '@farcaster/frame-sdk';
-// Using only specific components or raw data to avoid default styling issues
-import { Avatar, Name } from '@coinbase/onchainkit/identity';
+// Using OnchainKit components for resolving Basenames/ENS for ALL users in leaderboard
+import { Avatar, Name, Identity } from '@coinbase/onchainkit/identity';
 
 // --- Smart Contract ABI ---
 const CONTRACT_ABI = [
@@ -79,6 +80,17 @@ export default function Game() {
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
 
+  // Leaderboard Read Hook
+  const { data: rawLeaderboard, refetch: refetchLeaderboard, isLoading: isReadingLeaderboard } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'getLeaderboard',
+    chainId: base.id, 
+    query: {
+        enabled: false, 
+    }
+  });
+
   // UI State
   const [level, setLevel] = useState(1);
   const [arrowsLeft, setArrowsLeft] = useState(10);
@@ -146,6 +158,22 @@ export default function Game() {
     assets.current.shardB_Blue = loadImg('https://base-archery-game.vercel.app/b-blue.webp');
     assets.current.shardAse_Blue = loadImg('https://base-archery-game.vercel.app/ase-blue.webp');
   }, []);
+
+  // Leaderboard Data Processing
+  useEffect(() => {
+    if (rawLeaderboard) {
+        const formatted: LeaderboardEntry[] = (rawLeaderboard as any[]).map((item) => ({
+            address: item.wallet,
+            level: Number(item.maxLevel),
+            tokenId: item.tokenId.toString(),
+            isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
+        }));
+        
+        formatted.sort((a, b) => b.level - a.level);
+        setLeaderboardData(formatted);
+        setIsLoadingLeaderboard(false);
+    }
+  }, [rawLeaderboard, address]);
 
   // Main Game Loop
   useEffect(() => {
@@ -370,6 +398,8 @@ export default function Game() {
                     stuckArrows.current.push({ angle: hitAngle });
                     flyingArrow.current = null;
                     spawnHitParticles(centerX, impactY);
+                    
+                    // React State Update for UI
                     setArrowsLeft(prev => {
                         const newVal = prev - 1;
                         if (newVal <= 0) {
@@ -453,34 +483,12 @@ export default function Game() {
     if (gameState.current === 'paused') gameState.current = 'playing';
   };
 
-  // --- DIRECT LEADERBOARD FETCH ---
-  // Using publicClient.readContract instead of hook to force fresh data
   const fetchLeaderboard = async () => {
-    if (!publicClient) return;
-    
     setIsLoadingLeaderboard(true);
-    setLeaderboardData([]); // Clear old data visually
-    
     try {
-        // Direct call bypassing Wagmi hook cache
-        const data = await publicClient.readContract({
-            address: CONTRACT_ADDRESS,
-            abi: CONTRACT_ABI,
-            functionName: 'getLeaderboard',
-        }) as any[];
-
-        const formatted: LeaderboardEntry[] = data.map((item) => ({
-            address: item.wallet,
-            level: Number(item.maxLevel),
-            tokenId: item.tokenId.toString(),
-            isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
-        }));
-        
-        formatted.sort((a, b) => b.level - a.level);
-        setLeaderboardData(formatted);
+        await refetchLeaderboard();
     } catch (e) {
         console.error("Fetch leaderboard error", e);
-    } finally {
         setIsLoadingLeaderboard(false);
     }
   };
@@ -533,7 +541,7 @@ export default function Game() {
     window.open(shareUrl, '_blank');
   };
 
-  // --- RENDER PROFILE (Fixed Width) ---
+  // --- RENDER PROFILE ---
   const renderProfile = () => {
     if (frameContext?.user) {
         return (
@@ -554,13 +562,17 @@ export default function Game() {
     
     if (isConnected && address) {
         return (
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border border-current max-w-[140px] ${currentTheme === 'light' ? 'bg-gray-100 text-black border-blue-600/10' : 'bg-white/10 text-white border-white/20'}`}>
-                {/* Manual simple avatar placeholder */}
+            <button
+                type="button" 
+                onClick={() => disconnect()}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all active:scale-95 max-w-[140px] ${currentTheme === 'light' ? 'bg-gray-100 text-black border-blue-600/10 hover:bg-gray-200' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
+            >
+                {/* Manual simple avatar placeholder - Clean Design */}
                 <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex-shrink-0" />
                 <span className="font-bold text-xs tracking-wide truncate">
                     {address.slice(0, 4)}...{address.slice(-4)}
                 </span>
-            </div>
+            </button>
         );
     }
 
@@ -569,7 +581,7 @@ export default function Game() {
             type="button"
             onClick={handleConnect}
             className={`px-4 py-2 rounded-2xl font-bold text-xs tracking-widest font-orbitron transition-all active:scale-95 ${
-                currentTheme === 'light' ? 'bg-gray-100 text-black border-blue-600/10' : 'bg-white/10 text-white border-white/20'
+                currentTheme === 'light' ? 'bg-gray-100 text-black border-blue-600/10 hover:bg-gray-200' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
             } border`}
         >
             CONNECT
@@ -590,7 +602,7 @@ export default function Game() {
           BASE <span className="text-[#0000ff]">ARCHERY</span>
         </div>
         <div className="flex gap-2 items-center flex-shrink-0 min-w-0">
-            <button onClick={toggleTheme} className="p-1.5 hover:opacity-70 transition-opacity">
+            <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-500/10 transition-colors">
                 {currentTheme === 'dark' ? (
                     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
                 ) : (
@@ -601,28 +613,38 @@ export default function Game() {
         </div>
       </div>
 
-      {/* Stats & Icons Overlay */}
-      <div className="absolute top-[calc(70px+env(safe-area-inset-top))] w-full flex justify-center items-center gap-4 z-10 pointer-events-none px-5">
-        <button type="button" onClick={() => openModal('leaderboard')} className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}>
+      {/* Stats & Icons Overlay - Adjusted Top Offset */}
+      <div className="absolute top-[calc(90px+env(safe-area-inset-top))] w-full flex justify-center items-center gap-4 z-10 pointer-events-none px-5">
+        <button 
+            type="button"
+            onClick={() => openModal('leaderboard')}
+            className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
+        >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
         </button>
         <div className={`px-5 py-2 rounded-2xl border backdrop-blur-sm text-center min-w-[120px] ${currentTheme === 'light' ? 'bg-blue-50/80 border-blue-200' : 'bg-black/50 border-white/10'}`}>
             <div className="text-base font-bold tracking-widest font-orbitron">LEVEL {level}</div>
             <div className="text-sm font-bold text-[#0000ff] font-orbitron">{arrowsLeft} ARROWS</div>
         </div>
-        <button type="button" onClick={() => openModal('faq')} className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}>
+        <button 
+            type="button"
+            onClick={() => openModal('faq')}
+            className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
+        >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
         </button>
       </div>
 
-      <canvas ref={canvasRef} className="block w-full h-full touch-none select-none" onPointerDown={handlePointerDown} />
+      <canvas 
+        ref={canvasRef} 
+        className="block w-full h-full touch-none select-none"
+        onPointerDown={handlePointerDown}
+      />
 
       <div className={`absolute top-0 left-0 w-full h-full bg-black/60 backdrop-blur-sm flex flex-col justify-end transition-opacity duration-300 z-20 ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-        
-        {/* Leaderboard - Full Screen logic applied here */}
         <div className={`
             transform transition-transform duration-300 border-t shadow-2xl flex flex-col w-full
-            ${showLeaderboard ? 'h-full rounded-none pt-[calc(15px+env(safe-area-inset-top))]' : 'rounded-t-3xl p-6 pb-10'}
+            ${showLeaderboard ? 'h-full pt-[calc(20px+env(safe-area-inset-top))] rounded-none justify-start' : 'rounded-t-3xl p-6 pb-10 justify-end'}
             ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'translate-y-0' : 'translate-y-full'} 
             ${currentTheme === 'light' ? 'bg-white border-blue-100' : 'bg-[#1a1a1a] border-white/10'}
         `}>
@@ -642,11 +664,17 @@ export default function Game() {
                                     <div key={i} className={`flex justify-between items-center p-3 rounded-xl border ${item.isCurrentUser ? 'border-[#0000ff] bg-blue-500/10' : (currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10')}`}>
                                         <div className="flex items-center gap-3">
                                             <div className="text-lg font-black text-[#0000ff] w-6 flex-shrink-0">#{i + 1}</div>
+                                            
+                                            {/* Identity Component for automatic Basename/ENS resolution */}
                                             <div className="flex flex-col overflow-hidden">
-                                                <span className={`text-sm font-bold truncate ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`}>
-                                                  {/* Show 'You' for current user, otherwise short address */}
-                                                  {item.isCurrentUser ? 'YOU' : `${item.address.slice(0, 6)}...${item.address.slice(-4)}`}
-                                                </span>
+                                                <Identity 
+                                                    address={item.address as `0x${string}`} 
+                                                    schemaId="0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9"
+                                                    className="flex items-center gap-2"
+                                                >
+                                                    <Avatar className="w-5 h-5 rounded-full" />
+                                                    <Name className={`text-sm font-bold truncate ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`} />
+                                                </Identity>
                                                 <span className="text-[10px] opacity-50 uppercase">Token #{item.tokenId}</span>
                                             </div>
                                         </div>
