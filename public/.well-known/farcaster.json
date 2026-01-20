@@ -7,12 +7,36 @@
   "frame": {
     "version": "1",
     "name": "Base Archery",
-    "iconUrl": "https://base-archery-game.vercel.app/base-logo.png",
+    "iconUrl": "https://base-archery-game.vercel.app/logo.png",
     "homeUrl": "https://base-archery-game.vercel.app",
     "imageUrl": "https://base-archery-game.vercel.app/opengraph-image.png",
     "buttonTitle": "Play Archery",
     "splashImageUrl": "https://base-archery-game.vercel.app/splash.png",
     "splashBackgroundColor": "#ffffff",
     "webhookUrl": "https://base-archery-game.vercel.app/api/webhook"
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "Base Archery",
+    "homeUrl": "https://base-archery-game.vercel.app",
+    "iconUrl": "https://base-archery-game.vercel.app/logo.png",
+    "splashImageUrl": "https://base-archery-game.vercel.app/splash.png",
+    "splashBackgroundColor": "#ffffff",
+    "webhookUrl": "https://base-archery-game.vercel.app/api/webhook",
+    "subtitle": "Base Archery: Hit the History.",
+    "description": "An addictive precision arcade game on the Base network. Clear as many levels as possible without hitting other arrows. Your best result can be saved as a stylish NFT. Simple, fast, on-chain.",
+    "screenshotUrls": [
+      "https://base-archery-game.vercel.app/scr1.png",
+      "https://base-archery-game.vercel.app/scr2.png",
+      "https://base-archery-game.vercel.app/scr3.png"
+    ],
+    "primaryCategory": "gaming",
+    "tags": ["game", "miniapp", "casual"],
+    "heroImageUrl": "https://base-archery-game.vercel.app/logo.png",
+    "tagline": "Become a Base Legend",
+    "ogTitle": "Base Archery",
+    "ogDescription": "An addictive precision arcade game on the Base network.",
+    "ogImageUrl": "https://base-archery-game.vercel.app/splash.png",
+    "noindex": false
   }
 }
