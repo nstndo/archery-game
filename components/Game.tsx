@@ -466,34 +466,35 @@ export default function Game() {
     else document.body.classList.remove('dark-mode');
   };
 
-  // UPDATED CONNECT HANDLER FOR WARPCAST/INJECTED WALLETS
+  // UPDATED CONNECT HANDLER FOR INJECTED WALLETS
   const handleConnect = () => {
     if (isConnected) {
         disconnect();
     } else {
-        // Priority 1: Check for 'injected' (Warpcast internal wallet usually maps here)
+        console.log("Connecting... Available connectors:", connectors.map(c => c.id));
+        
+        // 1. Try generic 'injected' (Standard for WebView wallets like Warpcast)
         const injected = connectors.find(c => c.id === 'injected');
         if (injected) {
             connect({ connector: injected });
             return;
         }
 
-        // Priority 2: Check for any connector with type 'injected' (EIP-6963)
+        // 2. Try any connector that looks like injected (fallback)
+        // Many wallets use different IDs but set type to 'injected'
         const anyInjected = connectors.find(c => c.type === 'injected');
         if (anyInjected) {
              connect({ connector: anyInjected });
              return;
         }
         
-        // Priority 3: Coinbase Wallet
+        // 3. Fallback to Coinbase or First available
         const coinbase = connectors.find(c => c.id === 'coinbaseWalletSDK');
-        if (coinbase) {
-            connect({ connector: coinbase });
-            return;
+        const fallback = coinbase || connectors[0];
+
+        if (fallback) {
+            connect({ connector: fallback });
         }
-        
-        // Fallback: First available
-        if (connectors.length > 0) connect({ connector: connectors[0] });
     }
   };
 
