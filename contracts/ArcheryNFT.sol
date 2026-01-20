@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
@@ -29,17 +29,18 @@ contract ArcheryScore is ERC721URIStorage {
         updateLeaderboard(msg.sender, level, newItemId);
 
         string memory svg = string(abi.encodePacked(
-            '<svg xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMinYMin meet" viewBox="0 0 350 350">',
-
-            '<image href="https://base-archery-game.vercel.app/nft-bg.webp" x="0" y="0" width="350" height="350" />',
-            
-            '<style>',
-            '.score { fill: white; font-family: "Arial Black", "Impact", sans-serif; font-size: 160px; font-weight: 900; }',
-            '</style>',
-            
-            '<text x="50%" y="55%" class="score" dominant-baseline="middle" text-anchor="middle">',
-            Strings.toString(level),
-            '</text>',
+            '<svg width="500" height="500" viewBox="0 0 360 360" fill="none" xmlns="http://www.w3.org/2000/svg">',
+            '<defs>',
+                '<clipPath id="rounded"><rect x="0" y="0" width="100%" height="100%" rx="35" ry="35" /></clipPath>',
+                '<mask id="arrow-cutout"><rect width="360" height="360" fill="white"/><path d="M0 175 H160 V167 L179 179 L160 191 V183 H0 V175Z" fill="black"/></mask>',
+            '</defs>',
+            '<g clip-path="url(#rounded)">',
+                '<rect width="500" height="500" fill="#0052FF"/>',
+                '<circle cx="178.915" cy="179.095" r="100" fill="white" mask="url(#arrow-cutout)"/>',
+                '<style>.level-num { fill: white; font-family: sans-serif; font-size: 50px; font-weight: bold; } .brand { fill: white; font-family: sans-serif; font-weight: 900; font-size: 24px; letter-spacing: 2px; }</style>',
+                '<text x="50%" y="12%" class="level-num" dominant-baseline="middle" text-anchor="middle">', Strings.toString(level), '</text>',
+                '<text x="50%" y="90%" class="brand" dominant-baseline="middle" text-anchor="middle">BASE ARCHERY</text>',
+            '</g>',
             '</svg>'
         ));
 
