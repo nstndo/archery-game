@@ -58,7 +58,7 @@ interface LeaderboardEntry {
     address: string;
     level: number;
     tokenId: string;
-    isCurrentUser: boolean; // Flag to identify current user in list
+    isCurrentUser: boolean;
 }
 
 export default function Game() {
@@ -98,7 +98,6 @@ export default function Game() {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   
-  // Theme State
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
   
   // Farcaster/Base App Context State
@@ -128,11 +127,8 @@ export default function Game() {
   useEffect(() => {
     const initSDK = async () => {
         try {
-            // Load context (user profile)
             const context = await sdk.context;
             setFrameContext(context);
-            
-            // Notify that frame is ready
             await sdk.actions.ready();
             setIsSDKLoaded(true);
         } catch (err) {
@@ -167,18 +163,16 @@ export default function Game() {
             address: item.wallet,
             level: Number(item.maxLevel),
             tokenId: item.tokenId.toString(),
-            // Check if this entry belongs to current connected wallet
             isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
         }));
         
         formatted.sort((a, b) => b.level - a.level);
-        
         setLeaderboardData(formatted);
         setIsLoadingLeaderboard(false);
     }
   }, [rawLeaderboard, address]);
 
-  // Main Game Loop
+  // Main Game Loop (Skipped detailing loop code to focus on fixes, it remains same as previous working version)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -200,16 +194,13 @@ export default function Game() {
         width = window.innerWidth;
         height = window.innerHeight;
       }
-      
       const dpr = window.devicePixelRatio || 1;
       canvas.width = width * dpr;
       canvas.height = height * dpr;
-      
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-
       targetRadius = width < 380 ? 80 : 90;
     };
 
@@ -222,19 +213,15 @@ export default function Game() {
       ctx.fillStyle = color;
       ctx.shadowColor = currentTheme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,255,0.4)';
       ctx.shadowBlur = 8;
-
       const headLen = 20;
       const headWidth = 12;
       const shaftWidth = 3;
-
       if (isStuck) {
         ctx.rotate(angle || 0);
         ctx.translate(targetRadius, 0);
-        
         ctx.beginPath();
         ctx.roundRect(0, -1.5, arrowLength, 3, 2);
         ctx.fill();
-
         ctx.beginPath();
         ctx.moveTo(-2, 0);
         ctx.lineTo(12, -7);
@@ -242,7 +229,6 @@ export default function Game() {
         ctx.lineTo(12, 7);
         ctx.closePath();
         ctx.fill();
-
         ctx.beginPath();
         const tailX = arrowLength;
         ctx.moveTo(tailX - 14, 0);
@@ -253,14 +239,11 @@ export default function Game() {
         ctx.lineTo(tailX, 8);
         ctx.closePath();
         ctx.fill();
-
       } else {
         ctx.translate(x, y);
-        
         ctx.beginPath();
         ctx.roundRect(-1.5, 0, 3, arrowLength, 2);
         ctx.fill();
-
         ctx.beginPath();
         ctx.moveTo(0, -2);
         ctx.lineTo(-7, 12);
@@ -268,7 +251,6 @@ export default function Game() {
         ctx.lineTo(7, 12);
         ctx.closePath();
         ctx.fill();
-
         ctx.beginPath();
         const tailY = arrowLength;
         ctx.moveTo(0, tailY - 14);
@@ -286,7 +268,6 @@ export default function Game() {
     const spawnHitParticles = (x: number, y: number) => {
       const bImg = currentTheme === 'dark' ? assets.current.shardB : assets.current.shardB_Blue;
       const aseImg = currentTheme === 'dark' ? assets.current.shardAse : assets.current.shardAse_Blue;
-
       if (bImg) particles.current.push(createParticle(x, y, bImg, 24));
       if (aseImg) {
         for (let i = 0; i < 3; i++) particles.current.push(createParticle(x, y, aseImg, 18));
@@ -332,7 +313,6 @@ export default function Game() {
       const centerY = height * 0.35;
       const startArrowY = height * 0.82;
 
-      // 1. Draw Target
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(rotation.current);
@@ -347,7 +327,6 @@ export default function Game() {
         ctx.lineWidth = 2;
         ctx.stroke();
       } else {
-        // Fallback target
         ctx.beginPath();
         ctx.arc(0, 0, targetRadius, 0, Math.PI * 2);
         ctx.fillStyle = '#0000ff';
@@ -355,17 +334,14 @@ export default function Game() {
       }
       ctx.restore();
 
-      // 2. Draw Stuck Arrows
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(rotation.current);
       stuckArrows.current.forEach(a => drawArrow(0, 0, a.angle, true));
       ctx.restore();
 
-      // 3. Particles (Always update)
       updateAndDrawParticles();
 
-      // 4. Game Physics (Only when playing)
       if (gameState.current === 'playing') {
         rotationChangeTimer.current--;
         if (rotationChangeTimer.current <= 0) {
@@ -386,13 +362,11 @@ export default function Game() {
                 let hitAngle = (Math.PI / 2) - rotation.current;
                 hitAngle = hitAngle % (Math.PI * 2);
                 if (hitAngle < 0) hitAngle += Math.PI * 2;
-
                 const collision = stuckArrows.current.some(a => {
                     let diff = Math.abs(a.angle - hitAngle);
                     if (diff > Math.PI) diff = (Math.PI * 2) - diff;
                     return diff < 0.04; 
                 });
-
                 if (collision) {
                     gameState.current = 'gameover';
                     setIsGameOver(true);
@@ -400,7 +374,6 @@ export default function Game() {
                     stuckArrows.current.push({ angle: hitAngle });
                     flyingArrow.current = null;
                     spawnHitParticles(centerX, impactY);
-                    
                     setArrowsLeft(prev => {
                         const newVal = prev - 1;
                         if (newVal <= 0) {
@@ -414,24 +387,21 @@ export default function Game() {
         }
       }
 
-      // 5. Draw Active/Ready Arrow
       if (flyingArrow.current) {
         drawArrow(centerX, flyingArrow.current.y);
       } else if (arrowsLeft > 0 && gameState.current === 'playing') {
         drawArrow(centerX, startArrowY);
       }
-
       animationFrameId = requestAnimationFrame(loop);
     };
-
     loop();
-
     return () => {
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(animationFrameId);
     };
   }, [level, arrowsLeft, currentTheme]);
 
+  // --- Actions ---
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeft <= 0) return;
     const h = containerRef.current?.clientHeight || window.innerHeight;
@@ -447,7 +417,6 @@ export default function Game() {
 
   const resetLevel = (lvl: number) => {
     if (resetContract) resetContract(); 
-    
     setLevel(lvl);
     setArrowsLeft(10);
     stuckArrows.current = [];
@@ -466,25 +435,14 @@ export default function Game() {
     else document.body.classList.remove('dark-mode');
   };
 
-  // UPDATED CONNECT HANDLER FOR INJECTED WALLETS (AGAIN)
   const handleConnect = () => {
     if (isConnected) {
         disconnect();
     } else {
-        // Just try to connect with the first available connector, or specifically look for Injected
-        // This is usually what Farcaster expects
-        
-        // Priority 1: EIP-6963 Injected Provider (Warpcast wallet often appears here)
         const injected = connectors.find(c => c.type === 'injected');
-        
-        // Priority 2: Coinbase Wallet
         const coinbase = connectors.find(c => c.id === 'coinbaseWalletSDK');
-        
         const connector = injected || coinbase || connectors[0];
-
-        if (connector) {
-            connect({ connector });
-        }
+        if (connector) connect({ connector });
     }
   };
 
@@ -518,12 +476,10 @@ export default function Game() {
         handleConnect();
         return;
     }
-    // We check chainId but we don't block. We request switch.
     if (chainId !== base.id) {
         try {
             await switchChain({ chainId: base.id });
-            // Wait a bit? Or just let user click again.
-            return; 
+            return;
         } catch (error) {
             console.error("Failed to switch chain", error);
             return;
@@ -538,31 +494,41 @@ export default function Game() {
     });
   };
 
-  // --- SHARE FUNCTION (FIXED FOR BASE APP) ---
-  const handleShare = () => {
-    const text = encodeURIComponent(`I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`);
-    const embed = encodeURIComponent('https://base-archery-game.vercel.app'); 
-    
-    // Create the compose URL for Warpcast
-    const shareUrl = `https://warpcast.com/~/compose?text=${text}&embeds[]=${embed}`;
-    
-    // Use SDK to open URL natively
+  // --- UPDATED SHARE FUNCTION (WEB SHARE API) ---
+  const handleShare = async () => {
+    const shareData = {
+        title: 'Base Archery',
+        text: `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`,
+        url: 'https://base-archery-game.vercel.app'
+    };
+
+    // 1. Try Native Web Share (Works great in Mobile Base App / Safari / Chrome)
+    if (typeof navigator !== 'undefined' && navigator.share) {
+        try {
+            await navigator.share(shareData);
+            return;
+        } catch (err) {
+            console.log("Web Share cancelled/failed, trying fallback");
+        }
+    }
+
+    // 2. Fallback: Farcaster SDK (if available)
+    const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(shareData.text)}&embeds[]=${encodeURIComponent(shareData.url)}`;
     if (isSDKLoaded && sdk.actions && sdk.actions.openUrl) {
         try {
-            sdk.actions.openUrl(shareUrl);
+            sdk.actions.openUrl(warpcastUrl);
             return;
         } catch (e) {
             console.warn("SDK openUrl failed", e);
         }
     }
 
-    // Fallback
-    window.open(shareUrl, '_blank');
+    // 3. Ultimate Fallback: New Window
+    window.open(warpcastUrl, '_blank');
   };
 
-  // --- RENDER HEADER PROFILE ---
+  // --- RENDER PROFILE ---
   const renderProfile = () => {
-    // If we have Farcaster context, display username
     if (frameContext?.user) {
         return (
             <div className="flex items-center gap-3 bg-opacity-20 bg-white px-4 py-1.5 rounded-2xl border border-white/20">
@@ -579,8 +545,6 @@ export default function Game() {
             </div>
         );
     }
-
-    // Fallback to Wallet Address if connected but no Farcaster profile
     return (
         <button 
             type="button"
@@ -618,36 +582,20 @@ export default function Game() {
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
                 )}
             </button>
-            
-            {/* Render Profile or Connect Button */}
             {renderProfile()}
         </div>
       </div>
 
       {/* Stats & Icons Overlay */}
       <div className="absolute top-[calc(70px+env(safe-area-inset-top))] w-full flex justify-center items-center gap-4 z-10 pointer-events-none px-5">
-        
-        {/* Leaderboard Button */}
-        <button 
-            type="button"
-            onClick={() => openModal('leaderboard')}
-            className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
-        >
+        <button type="button" onClick={() => openModal('leaderboard')} className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
         </button>
-        
-        {/* Level Badge */}
         <div className={`px-5 py-2 rounded-2xl border backdrop-blur-sm text-center min-w-[120px] ${currentTheme === 'light' ? 'bg-blue-50/80 border-blue-200' : 'bg-black/50 border-white/10'}`}>
             <div className="text-base font-bold tracking-widest font-orbitron">LEVEL {level}</div>
             <div className="text-sm font-bold text-[#0000ff] font-orbitron">{arrowsLeft} ARROWS</div>
         </div>
-
-        {/* FAQ Button */}
-        <button 
-            type="button"
-            onClick={() => openModal('faq')}
-            className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
-        >
+        <button type="button" onClick={() => openModal('faq')} className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
         </button>
       </div>
@@ -658,77 +606,16 @@ export default function Game() {
         onPointerDown={handlePointerDown}
       />
 
-      {/* Modals Overlay */}
+      {/* Modals Overlay - Updated Logic for Leaderboard */}
       <div className={`absolute top-0 left-0 w-full h-full bg-black/60 backdrop-blur-sm flex flex-col justify-end transition-opacity duration-300 z-20 ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-        
-        <div className={`rounded-t-3xl p-6 pb-10 text-center transform transition-transform duration-300 border-t shadow-2xl ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'translate-y-0' : 'translate-y-full'} ${currentTheme === 'light' ? 'bg-white border-blue-100' : 'bg-[#1a1a1a] border-white/10'}`}>
-            
-            {isGameOver && (
-                <>
-                    <h2 className={`font-orbitron text-2xl font-black mb-2 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>GAME OVER</h2>
-                    <p className="font-orbitron text-sm text-gray-500 mb-6 tracking-wide">You hit another arrow!</p>
-                    
-                    <div className={`rounded-2xl p-5 mb-6 border flex justify-center items-center ${currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-[#252525] border-white/5'}`}>
-                        <div className="text-center">
-                            <div className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Level Reached</div>
-                            <div className="text-3xl font-black text-[#0000ff]">{level}</div>
-                        </div>
-                    </div>
-
-                    {isConfirmed && (
-                        <button 
-                            onClick={handleShare}
-                            className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 mb-3 active:scale-98 transition-transform`}
-                        >
-                            SHARE ACHIEVEMENT
-                        </button>
-                    )}
-
-                    <button 
-                        onClick={handleMint} 
-                        disabled={isPending || isConfirming || isConfirmed} 
-                        className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest 
-                            ${isConfirmed ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-[#0000ff] text-white shadow-lg shadow-blue-600/30'} 
-                            mb-3 active:scale-98 transition-transform disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none border border-transparent`}
-                    >
-                        {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted Successfully' : 'Mint Record NFT'}
-                    </button>
-
-                    <button onClick={() => resetLevel(1)} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
-                        Try Again
-                    </button>
-                </>
-            )}
-
-            {isLevelComplete && (
-                <>
-                    <h2 className={`font-orbitron text-2xl font-black mb-2 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>LEVEL COMPLETE!</h2>
-                    <p className="font-orbitron text-sm text-gray-500 mb-8 tracking-wide">Great shot! Ready for the next challenge?</p>
-                    <button onClick={() => resetLevel(level + 1)} className="w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 active:scale-98 transition-transform">
-                        Next Level
-                    </button>
-                </>
-            )}
-
-            {showFaq && (
-                <>
-                    <h2 className={`font-orbitron text-2xl font-black mb-6 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>GAME RULES</h2>
-                    <div className={`text-left mb-6 text-sm font-roboto space-y-4 ${currentTheme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
-                        <div className="border-b pb-3 border-current border-opacity-10">
-                            <div className="text-[#0000ff] font-bold mb-1">HOW TO PLAY?</div>
-                            <div>Tap anywhere to shoot. Fill the target without hitting other arrows.</div>
-                        </div>
-                        <div className="border-b pb-3 border-current border-opacity-10">
-                            <div className="text-[#0000ff] font-bold mb-1">WHAT ARE NFTS?</div>
-                            <div>Your high score can be minted as a unique NFT on the Base blockchain.</div>
-                        </div>
-                    </div>
-                    <button onClick={closeModal} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
-                        Close
-                    </button>
-                </>
-            )}
-
+        <div className={`
+            text-center transform transition-transform duration-300 border-t shadow-2xl 
+            ${showLeaderboard ? 'h-full pt-[calc(20px+env(safe-area-inset-top))] rounded-none' : 'rounded-t-3xl p-6 pb-10'}
+            ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'translate-y-0' : 'translate-y-full'} 
+            ${currentTheme === 'light' ? 'bg-white border-blue-100' : 'bg-[#1a1a1a] border-white/10'}
+            flex flex-col w-full
+        `}>
+            {/* Added logic specifically for Leaderboard Full Height Fix */}
             {showLeaderboard && (
                 <div className="flex flex-col h-full px-5 pb-5">
                     <h2 className={`font-orbitron text-2xl font-black mb-6 uppercase flex-shrink-0 ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>LEADERBOARD</h2>
@@ -742,8 +629,8 @@ export default function Game() {
                                         <div className="flex items-center gap-4">
                                             <div className="text-lg font-black text-[#0000ff] w-6">#{i + 1}</div>
                                             <div className="flex flex-col">
-                                                {/* Use username if current user or if we could map it (mocked here) */}
-                                                <span className="text-sm font-bold">
+                                                {/* Use Username if available (Current User), else Short Address */}
+                                                <span className={`text-sm font-bold ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`}>
                                                   {item.isCurrentUser && frameContext?.user?.username 
                                                     ? frameContext.user.username 
                                                     : `${item.address.slice(0, 6)}...${item.address.slice(-4)}`
@@ -771,9 +658,71 @@ export default function Game() {
                 </div>
             )}
 
+            {/* Other Modals (Game Over, etc) - No changes */}
+            {!showLeaderboard && (
+                <>
+                    {isGameOver && (
+                        <>
+                            <h2 className={`font-orbitron text-2xl font-black mb-2 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>GAME OVER</h2>
+                            <p className="font-orbitron text-sm text-gray-500 mb-6 tracking-wide">You hit another arrow!</p>
+                            <div className={`rounded-2xl p-5 mb-6 border flex justify-center items-center ${currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-[#252525] border-white/5'}`}>
+                                <div className="text-center">
+                                    <div className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Level Reached</div>
+                                    <div className="text-3xl font-black text-[#0000ff]">{level}</div>
+                                </div>
+                            </div>
+
+                            {isConfirmed && (
+                                <button 
+                                    onClick={handleShare}
+                                    className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 mb-3 active:scale-98 transition-transform`}
+                                >
+                                    SHARE ACHIEVEMENT
+                                </button>
+                            )}
+
+                            <button onClick={handleMint} disabled={isPending || isConfirming || isConfirmed} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest ${isConfirmed ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-[#0000ff] text-white shadow-lg shadow-blue-600/30'} mb-3 active:scale-98 transition-transform disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none border border-transparent`}>
+                                {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted Successfully' : 'Mint Record NFT'}
+                            </button>
+                            <button onClick={() => resetLevel(1)} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
+                                Try Again
+                            </button>
+                        </>
+                    )}
+
+                    {isLevelComplete && (
+                        <>
+                            <h2 className={`font-orbitron text-2xl font-black mb-2 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>LEVEL COMPLETE!</h2>
+                            <p className="font-orbitron text-sm text-gray-500 mb-8 tracking-wide">Great shot! Ready for the next challenge?</p>
+                            <button onClick={() => resetLevel(level + 1)} className="w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 active:scale-98 transition-transform">
+                                Next Level
+                            </button>
+                        </>
+                    )}
+
+                    {showFaq && (
+                        <>
+                            <h2 className={`font-orbitron text-2xl font-black mb-6 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>GAME RULES</h2>
+                            <div className={`text-left mb-6 text-sm font-roboto space-y-4 ${currentTheme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
+                                <div className="border-b pb-3 border-current border-opacity-10">
+                                    <div className="text-[#0000ff] font-bold mb-1">HOW TO PLAY?</div>
+                                    <div>Tap anywhere to shoot. Fill the target without hitting other arrows.</div>
+                                </div>
+                                <div className="border-b pb-3 border-current border-opacity-10">
+                                    <div className="text-[#0000ff] font-bold mb-1">WHAT ARE NFTS?</div>
+                                    <div>Your high score can be minted as a unique NFT on the Base blockchain.</div>
+                                </div>
+                            </div>
+                            <button onClick={closeModal} className={`w-full p-4 rounded-2xl font-orbitron font-black text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}>
+                                Close
+                            </button>
+                        </>
+                    )}
+                </>
+            )}
+
         </div>
       </div>
-
     </div>
   );
 }
