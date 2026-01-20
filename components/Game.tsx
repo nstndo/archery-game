@@ -5,8 +5,10 @@ import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTran
 import { base } from 'viem/chains';
 import { parseAbiItem } from 'viem';
 import sdk from '@farcaster/frame-sdk';
+// Import hook for sharing according to Base App docs
+import { useComposeCast } from '@coinbase/onchainkit/minikit';
 
-// --- ABI Смарт-контракта ---
+// --- Smart Contract ABI (Includes getLeaderboard) ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -35,10 +37,10 @@ const CONTRACT_ABI = [
   }
 ] as const;
 
-// АДРЕС ВАШЕГО КОНТРАКТА В MAINNET
-const CONTRACT_ADDRESS = "0x2441E2FfD92d63f003Fc63626e69FA79A7AaEEa7"; 
+// YOUR MAINNET CONTRACT ADDRESS
+const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9"; 
 
-// --- Типы ---
+// --- Types ---
 interface Arrow {
   angle: number;
 }
@@ -73,20 +75,23 @@ export default function Game() {
   const { switchChain } = useSwitchChain();
   const publicClient = usePublicClient();
   
-  // Хуки для записи в контракт (Минт)
+  // Hooks for contract writing (Mint)
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
 
-  // Хук для чтения Лидерборда (В MAINNET)
+  // Hook for reading Leaderboard (In MAINNET)
   const { data: rawLeaderboard, refetch: refetchLeaderboard, isLoading: isReadingLeaderboard } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: 'getLeaderboard',
-    chainId: base.id, // Используем Base Mainnet
+    chainId: base.id, // Using Base Mainnet
     query: {
-        enabled: false, // Не загружать автоматически при старте
+        enabled: false, // Do not fetch automatically on start
     }
   });
+
+  // Base App Share Hook
+  const { composeCast } = useComposeCast();
 
   // UI State
   const [level, setLevel] = useState(1);
@@ -137,17 +142,15 @@ export default function Game() {
     initSDK();
   }, []);
 
-  // Init Assets
+  // Assets Init
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
     const loadImg = (src: string) => {
       const img = new Image();
       img.crossOrigin = "Anonymous";
       img.src = src;
       return img;
     };
-
     assets.current.target = loadImg('https://base-archery-game.vercel.app/base-logo.webp');
     assets.current.shardB = loadImg('https://base-archery-game.vercel.app/b-white.webp');
     assets.current.shardAse = loadImg('https://base-archery-game.vercel.app/ase-white.webp');
@@ -158,12 +161,14 @@ export default function Game() {
   // Leaderboard Data Processing
   useEffect(() => {
     if (rawLeaderboard) {
+        // Format data as needed
         const formatted: LeaderboardEntry[] = (rawLeaderboard as any[]).map((item) => ({
             address: item.wallet,
             level: Number(item.maxLevel),
             tokenId: item.tokenId.toString()
         }));
         
+        // Sort by level descending
         formatted.sort((a, b) => b.level - a.level);
         
         setLeaderboardData(formatted);
@@ -279,7 +284,6 @@ export default function Game() {
     const spawnHitParticles = (x: number, y: number) => {
       const bImg = currentTheme === 'dark' ? assets.current.shardB : assets.current.shardB_Blue;
       const aseImg = currentTheme === 'dark' ? assets.current.shardAse : assets.current.shardAse_Blue;
-
       if (bImg) particles.current.push(createParticle(x, y, bImg, 24));
       if (aseImg) {
         for (let i = 0; i < 3; i++) particles.current.push(createParticle(x, y, aseImg, 18));
@@ -325,7 +329,6 @@ export default function Game() {
       const centerY = height * 0.35;
       const startArrowY = height * 0.82;
 
-      // 1. Draw Target
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(rotation.current);
@@ -340,7 +343,6 @@ export default function Game() {
         ctx.lineWidth = 2;
         ctx.stroke();
       } else {
-        // Fallback target
         ctx.beginPath();
         ctx.arc(0, 0, targetRadius, 0, Math.PI * 2);
         ctx.fillStyle = '#0000ff';
@@ -348,19 +350,15 @@ export default function Game() {
       }
       ctx.restore();
 
-      // 2. Draw Stuck Arrows
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(rotation.current);
       stuckArrows.current.forEach(a => drawArrow(0, 0, a.angle, true));
       ctx.restore();
 
-      // 3. Particles (Always update)
       updateAndDrawParticles();
 
-      // 4. Game Physics (Only when playing)
       if (gameState.current === 'playing') {
-        // Rotation Logic
         rotationChangeTimer.current--;
         if (rotationChangeTimer.current <= 0) {
             rotationChangeTimer.current = 60 + Math.random() * 120;
@@ -371,9 +369,7 @@ export default function Game() {
         currentSpeed.current += (targetSpeed.current - currentSpeed.current) * 0.03;
         rotation.current += currentSpeed.current;
 
-        // Flying Arrow Logic
         if (flyingArrow.current) {
-            // Speed increased from 25 to 40
             flyingArrow.current.y -= 40;
             const impactY = centerY + targetRadius;
 
@@ -396,8 +392,6 @@ export default function Game() {
                     stuckArrows.current.push({ angle: hitAngle });
                     flyingArrow.current = null;
                     spawnHitParticles(centerX, impactY);
-                    
-                    // React State Update for UI
                     setArrowsLeft(prev => {
                         const newVal = prev - 1;
                         if (newVal <= 0) {
@@ -411,7 +405,6 @@ export default function Game() {
         }
       }
 
-      // 5. Draw Active/Ready Arrow
       if (flyingArrow.current) {
         drawArrow(centerX, flyingArrow.current.y);
       } else if (arrowsLeft > 0 && gameState.current === 'playing') {
@@ -429,7 +422,6 @@ export default function Game() {
     };
   }, [level, arrowsLeft, currentTheme]);
 
-  // --- Actions ---
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeft <= 0) return;
     const h = containerRef.current?.clientHeight || window.innerHeight;
@@ -468,9 +460,13 @@ export default function Game() {
     if (isConnected) {
         disconnect();
     } else {
-        const coinbaseConnector = connectors.find((c) => c.id === 'coinbaseWalletSDK');
-        if (coinbaseConnector) {
-            connect({ connector: coinbaseConnector, chainId: base.id });
+        // Find available connector: prioritize Injected (MetaMask etc), then Coinbase, or fallback to first available
+        const connector = connectors.find((c) => c.id === 'injected' || c.id === 'metaMask') ||
+                          connectors.find((c) => c.id === 'coinbaseWalletSDK') ||
+                          connectors[0];
+                          
+        if (connector) {
+            connect({ connector, chainId: base.id });
         }
     }
   };
