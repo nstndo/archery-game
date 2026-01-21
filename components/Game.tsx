@@ -72,7 +72,8 @@ export default function Game() {
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
-  const publicClient = usePublicClient(); // Используем для прямого чтения
+  const publicClient = usePublicClient();
+  const { composeCast } = useComposeCast();
   
   // Mint Hooks
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
@@ -553,8 +554,6 @@ export default function Game() {
     });
   };
 
-  const { composeCast } = useComposeCast();
-  
   const handleShare = () => {
   composeCast({
     text: `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`,
