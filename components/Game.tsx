@@ -35,7 +35,7 @@ const CONTRACT_ABI = [
   }
 ] as const;
 
-// ADDRESS
+// ADRESS
 const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9"; 
 
 // --- Types ---
@@ -186,9 +186,15 @@ export default function Game() {
     const arrowLength = 65;
 
     const handleResize = () => {
-      // Use window dimensions directly for canvas to ensure full coverage
-      width = window.innerWidth;
-      height = window.innerHeight;
+      // FIX: Use container dimensions instead of window to prevent squashing on desktop
+      const container = containerRef.current;
+      if (container) {
+        width = container.clientWidth;
+        height = container.clientHeight;
+      } else {
+        width = window.innerWidth;
+        height = window.innerHeight;
+      }
       
       const dpr = window.devicePixelRatio || 1;
       canvas.width = width * dpr;
@@ -424,7 +430,8 @@ export default function Game() {
   // --- Actions ---
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeft <= 0) return;
-    const h = window.innerHeight; 
+    // Fix: Use container height for shoot logic too, to keep in sync with visual
+    const h = containerRef.current?.clientHeight || window.innerHeight;
     flyingArrow.current = { y: h * 0.82 };
   };
 
@@ -659,13 +666,17 @@ export default function Game() {
                                     <div key={i} className={`flex justify-between items-center p-3 rounded-xl border ${item.isCurrentUser ? 'border-[#0000ff] bg-blue-500/10' : (currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10')}`}>
                                         <div className="flex items-center gap-3">
                                             <div className="text-lg font-black text-[#0000ff] w-6 flex-shrink-0">#{i + 1}</div>
+                                            
+                                            {/* Identity Component for automatic Basename/ENS resolution */}
                                             <div className="flex flex-col overflow-hidden">
-                                                <span className={`text-sm font-bold truncate ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`}>
-                                                  {item.isCurrentUser && frameContext?.user?.username 
-                                                    ? frameContext.user.username 
-                                                    : `${item.address.slice(0, 6)}...${item.address.slice(-4)}`
-                                                  }
-                                                </span>
+                                                <Identity 
+                                                    address={item.address as `0x${string}`} 
+                                                    schemaId="0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9"
+                                                    className="flex items-center gap-2"
+                                                >
+                                                    <Avatar className="w-5 h-5 rounded-full" />
+                                                    <Name className={`text-sm font-bold truncate ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`} />
+                                                </Identity>
                                                 <span className="text-xs opacity-50">Token ID: {item.tokenId}</span>
                                             </div>
                                         </div>
