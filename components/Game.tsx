@@ -4,9 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient, useReadContract } from 'wagmi';
 import { base } from 'viem/chains';
 import sdk, { type FrameContext } from '@farcaster/frame-sdk';
-import { Avatar, Name, Identity } from '@coinbase/onchainkit/identity';
 
-// --- ABI ---
+// --- ABI Смарт-контракта ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -35,10 +34,10 @@ const CONTRACT_ABI = [
   }
 ] as const;
 
-// ADDRESS
+// АДРЕС КОНТРАКТА
 const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9"; 
 
-// --- Types ---
+// --- Типы ---
 interface Arrow {
   angle: number;
 }
@@ -100,7 +99,7 @@ export default function Game() {
   
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
   
-  // Farcaster/Base App Context State
+  // Farcaster/Base App Context
   const [frameContext, setFrameContext] = useState<FrameContext | null>(null);
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
 
@@ -132,7 +131,7 @@ export default function Game() {
             await sdk.actions.ready();
             setIsSDKLoaded(true);
         } catch (err) {
-            // Silently fail if not in Frame environment
+            console.warn("SDK Init error", err);
         }
     };
     initSDK();
@@ -186,15 +185,9 @@ export default function Game() {
     const arrowLength = 65;
 
     const handleResize = () => {
-      // Always match container size exactly
-      const parent = containerRef.current;
-      if (parent) {
-        width = parent.clientWidth;
-        height = parent.clientHeight;
-      } else {
-        width = window.innerWidth;
-        height = window.innerHeight;
-      }
+      // Use window inner dimensions to ensure full screen coverage
+      width = window.innerWidth;
+      height = window.innerHeight;
       
       const dpr = window.devicePixelRatio || 1;
       canvas.width = width * dpr;
@@ -426,7 +419,7 @@ export default function Game() {
   // Actions
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeft <= 0) return;
-    const h = containerRef.current?.clientHeight || window.innerHeight;
+    const h = window.innerHeight; // Always use window height for shooting logic
     flyingArrow.current = { y: h * 0.82 };
   };
 
@@ -536,7 +529,7 @@ export default function Game() {
   const renderProfile = () => {
     if (frameContext?.user) {
         return (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-opacity-10 bg-current border border-current/20 max-w-[150px]">
+            <div className="flex items-center gap-3 bg-opacity-20 bg-white px-3 py-1.5 rounded-2xl border border-white/20 max-w-[150px]">
                 {frameContext.user.pfpUrl && (
                     <img 
                         src={frameContext.user.pfpUrl} 
@@ -580,60 +573,57 @@ export default function Game() {
   return (
     <div 
         ref={containerRef}
-        className={`relative w-full h-full max-w-[480px] flex flex-col overflow-hidden transition-colors duration-300 shadow-2xl mx-auto ${currentTheme === 'light' ? 'bg-white text-black' : 'bg-[#000010] text-white'}`}
+        // FIXED LAYOUT: Use fixed inset-0 to prevent collapsing/stretching issues
+        className={`fixed inset-0 w-full h-[100dvh] max-h-[100dvh] max-w-[480px] mx-auto flex flex-col overflow-hidden transition-colors duration-300 shadow-2xl ${currentTheme === 'light' ? 'bg-white text-black' : 'bg-[#000010] text-white'}`}
     >
-      {/* Canvas Layer - Absolute Position to fix Layout Shift */}
+      
+      {/* Top Bar */}
+      <div className={`flex justify-between items-center px-4 py-4 pt-[calc(15px+env(safe-area-inset-top))] backdrop-blur-md border-b transition-colors duration-300 flex-shrink-0 pointer-events-auto ${currentTheme === 'light' ? 'bg-white/85 border-blue-600/10' : 'bg-[#000020]/85 border-white/10'}`}>
+        <div className="font-orbitron font-black text-lg flex items-center gap-2 uppercase tracking-wide flex-shrink-0">
+          BASE <span className="text-[#0000ff]">ARCHERY</span>
+        </div>
+        <div className="flex gap-2 items-center flex-shrink-0 min-w-0">
+            <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-500/10 transition-colors">
+                {currentTheme === 'dark' ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
+                ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                )}
+            </button>
+            {renderProfile()}
+        </div>
+      </div>
+
+      {/* Stats Overlay */}
+      <div className="absolute top-[calc(90px+env(safe-area-inset-top))] w-full flex justify-center items-center gap-4 z-10 pointer-events-none px-5">
+        <button 
+            type="button"
+            onClick={() => openModal('leaderboard')}
+            className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+        </button>
+        <div className={`px-5 py-2 rounded-2xl border backdrop-blur-sm text-center min-w-[120px] ${currentTheme === 'light' ? 'bg-blue-50/80 border-blue-200' : 'bg-black/50 border-white/10'}`}>
+            <div className="text-base font-bold tracking-widest font-orbitron">LEVEL {level}</div>
+            <div className="text-sm font-bold text-[#0000ff] font-orbitron">{arrowsLeft} ARROWS</div>
+        </div>
+        <button 
+            type="button"
+            onClick={() => openModal('faq')}
+            className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+        </button>
+      </div>
+
       <canvas 
         ref={canvasRef} 
         className="absolute inset-0 block w-full h-full touch-none select-none z-0" 
         onPointerDown={handlePointerDown} 
       />
 
-      {/* UI Layer - Sits on top of canvas */}
-      <div className="absolute inset-0 z-10 flex flex-col pointer-events-none">
-        
-        {/* Top Bar */}
-        <div className={`flex justify-between items-center px-4 py-4 pt-[calc(15px+env(safe-area-inset-top))] backdrop-blur-md border-b transition-colors duration-300 flex-shrink-0 pointer-events-auto ${currentTheme === 'light' ? 'bg-white/85 border-blue-600/10' : 'bg-[#000020]/85 border-white/10'}`}>
-            <div className="font-orbitron font-black text-lg flex items-center gap-2 uppercase tracking-wide flex-shrink-0">
-            BASE <span className="text-[#0000ff]">ARCHERY</span>
-            </div>
-            <div className="flex gap-2 items-center flex-shrink-0 min-w-0">
-                <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-500/10 transition-colors">
-                    {currentTheme === 'dark' ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
-                    ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-                    )}
-                </button>
-                {renderProfile()}
-            </div>
-        </div>
-
-        {/* Stats Overlay */}
-        <div className="w-full flex justify-center items-center gap-4 px-5 mt-4 pointer-events-none">
-            <button 
-                type="button"
-                onClick={() => openModal('leaderboard')}
-                className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
-            </button>
-            <div className={`px-5 py-2 rounded-2xl border backdrop-blur-sm text-center min-w-[120px] ${currentTheme === 'light' ? 'bg-blue-50/80 border-blue-200' : 'bg-black/50 border-white/10'}`}>
-                <div className="text-base font-bold tracking-widest font-orbitron">LEVEL {level}</div>
-                <div className="text-sm font-bold text-[#0000ff] font-orbitron">{arrowsLeft} ARROWS</div>
-            </div>
-            <button 
-                type="button"
-                onClick={() => openModal('faq')}
-                className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
-            </button>
-        </div>
-      </div>
-
-      {/* Modals Overlay - Highest Z-Index */}
-      <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col justify-end transition-opacity duration-300 z-50 ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+      {/* Modals Overlay */}
+      <div className={`absolute top-0 left-0 w-full h-full bg-black/60 backdrop-blur-sm flex flex-col justify-end transition-opacity duration-300 z-20 ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <div className={`
             text-center transform transition-transform duration-300 border-t shadow-2xl flex flex-col w-full
             ${showLeaderboard ? 'h-full pt-[calc(20px+env(safe-area-inset-top))] rounded-none justify-start' : 'rounded-t-3xl p-6 pb-10 justify-end'}
@@ -655,18 +645,14 @@ export default function Game() {
                                     <div key={i} className={`flex justify-between items-center p-3 rounded-xl border ${item.isCurrentUser ? 'border-[#0000ff] bg-blue-500/10' : (currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10')}`}>
                                         <div className="flex items-center gap-3">
                                             <div className="text-lg font-black text-[#0000ff] w-6 flex-shrink-0">#{i + 1}</div>
-                                            
-                                            {/* Identity Component for automatic Basename/ENS resolution */}
                                             <div className="flex flex-col overflow-hidden">
-                                                <Identity 
-                                                    address={item.address as `0x${string}`} 
-                                                    schemaId="0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9"
-                                                    className="flex items-center gap-2"
-                                                >
-                                                    <Avatar className="w-5 h-5 rounded-full" />
-                                                    <Name className={`text-sm font-bold truncate ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`} />
-                                                </Identity>
-                                                <span className="text-[10px] opacity-50 uppercase">Token #{item.tokenId}</span>
+                                                <span className={`text-sm font-bold truncate ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`}>
+                                                  {item.isCurrentUser && frameContext?.user?.username 
+                                                    ? frameContext.user.username 
+                                                    : `${item.address.slice(0, 6)}...${item.address.slice(-4)}`
+                                                  }
+                                                </span>
+                                                <span className="text-xs opacity-50">Token ID: {item.tokenId}</span>
                                             </div>
                                         </div>
                                         <div className="text-[#0000ff] font-black text-xl flex-shrink-0">LVL {item.level}</div>
