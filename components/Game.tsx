@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient, useReadContract } from 'wagmi';
 import { base } from 'viem/chains';
 import sdk, { type FrameContext } from '@farcaster/frame-sdk';
-import { Avatar, Name, Identity } from '@coinbase/onchainkit/identity';
 
+// --- ABI ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -34,7 +34,7 @@ const CONTRACT_ABI = [
   }
 ] as const;
 
-// ADRESS
+// ADDRESS
 const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9"; 
 
 // --- Types ---
@@ -71,6 +71,7 @@ export default function Game() {
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
+  const publicClient = usePublicClient();
   
   // Mint Hooks
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
@@ -325,7 +326,7 @@ export default function Game() {
       const centerY = height * 0.35;
       const startArrowY = height * 0.82;
 
-      // 1. Draw Target
+      // Draw Target
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(rotation.current);
@@ -340,7 +341,6 @@ export default function Game() {
         ctx.lineWidth = 2;
         ctx.stroke();
       } else {
-        // Fallback target
         ctx.beginPath();
         ctx.arc(0, 0, targetRadius, 0, Math.PI * 2);
         ctx.fillStyle = '#0000ff';
@@ -348,17 +348,17 @@ export default function Game() {
       }
       ctx.restore();
 
-      // 2. Draw Stuck Arrows
+      // Draw Stuck Arrows
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(rotation.current);
       stuckArrows.current.forEach(a => drawArrow(0, 0, a.angle, true));
       ctx.restore();
 
-      // 3. Particles (Always update)
+      // Particles
       updateAndDrawParticles();
 
-      // 4. Game Physics (Only when playing)
+      // Physics
       if (gameState.current === 'playing') {
         rotationChangeTimer.current--;
         if (rotationChangeTimer.current <= 0) {
@@ -371,7 +371,6 @@ export default function Game() {
         rotation.current += currentSpeed.current;
 
         if (flyingArrow.current) {
-            // Speed increased from 25 to 40
             flyingArrow.current.y -= 40;
             const impactY = centerY + targetRadius;
 
@@ -380,13 +379,11 @@ export default function Game() {
                 let hitAngle = (Math.PI / 2) - rotation.current;
                 hitAngle = hitAngle % (Math.PI * 2);
                 if (hitAngle < 0) hitAngle += Math.PI * 2;
-
                 const collision = stuckArrows.current.some(a => {
                     let diff = Math.abs(a.angle - hitAngle);
                     if (diff > Math.PI) diff = (Math.PI * 2) - diff;
                     return diff < 0.04; 
                 });
-
                 if (collision) {
                     gameState.current = 'gameover';
                     setIsGameOver(true);
@@ -394,8 +391,6 @@ export default function Game() {
                     stuckArrows.current.push({ angle: hitAngle });
                     flyingArrow.current = null;
                     spawnHitParticles(centerX, impactY);
-                    
-                    // React State Update for UI
                     setArrowsLeft(prev => {
                         const newVal = prev - 1;
                         if (newVal <= 0) {
@@ -409,7 +404,7 @@ export default function Game() {
         }
       }
 
-      // 5. Draw Active/Ready Arrow
+      // Draw Active Arrow
       if (flyingArrow.current) {
         drawArrow(centerX, flyingArrow.current.y);
       } else if (arrowsLeft > 0 && gameState.current === 'playing') {
@@ -427,7 +422,7 @@ export default function Game() {
     };
   }, [level, arrowsLeft, currentTheme]);
 
-  // --- Actions ---
+  // Actions
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeft <= 0) return;
     const h = containerRef.current?.clientHeight || window.innerHeight;
@@ -443,7 +438,6 @@ export default function Game() {
 
   const resetLevel = (lvl: number) => {
     if (resetContract) resetContract(); 
-    
     setLevel(lvl);
     setArrowsLeft(10);
     stuckArrows.current = [];
@@ -521,7 +515,6 @@ export default function Game() {
     });
   };
 
-  // --- SHARE FUNCTION ---
   const handleShare = () => {
     const text = encodeURIComponent(`I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`);
     const embed = encodeURIComponent('https://base-archery-game.vercel.app'); 
@@ -538,11 +531,11 @@ export default function Game() {
     window.open(shareUrl, '_blank');
   };
 
-  // --- RENDER PROFILE ---
+  // Render Profile
   const renderProfile = () => {
     if (frameContext?.user) {
         return (
-            <div className="flex items-center gap-3 bg-opacity-20 bg-white px-3 py-1.5 rounded-2xl border border-white/20 max-w-[150px]">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-opacity-10 bg-current border border-current/20 max-w-[150px]">
                 {frameContext.user.pfpUrl && (
                     <img 
                         src={frameContext.user.pfpUrl} 
@@ -562,7 +555,7 @@ export default function Game() {
             <button
                 type="button" 
                 onClick={() => disconnect()}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border border-current transition-all active:scale-95 max-w-[140px] hover:opacity-70`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border border-current/20 transition-all active:scale-95 max-w-[140px] hover:opacity-70`}
             >
                 <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex-shrink-0" />
                 <span className="font-bold text-xs tracking-wide truncate">
@@ -576,7 +569,7 @@ export default function Game() {
         <button 
             type="button"
             onClick={handleConnect}
-            className={`px-4 py-2 rounded-2xl font-bold text-xs tracking-widest font-orbitron transition-all active:scale-95 border border-current hover:opacity-70`}
+            className={`px-4 py-2 rounded-2xl font-bold text-xs tracking-widest font-orbitron transition-all active:scale-95 border border-current/20 hover:opacity-70`}
         >
             CONNECT
         </button>
@@ -606,38 +599,26 @@ export default function Game() {
         </div>
       </div>
 
-      {/* Stats & Icons Overlay */}
+      {/* Stats Overlay */}
       <div className="absolute top-[calc(90px+env(safe-area-inset-top))] w-full flex justify-center items-center gap-4 z-10 pointer-events-none px-5">
-        <button 
-            type="button"
-            onClick={() => openModal('leaderboard')}
-            className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
-        >
+        <button type="button" onClick={() => openModal('leaderboard')} className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
         </button>
         <div className={`px-5 py-2 rounded-2xl border backdrop-blur-sm text-center min-w-[120px] ${currentTheme === 'light' ? 'bg-blue-50/80 border-blue-200' : 'bg-black/50 border-white/10'}`}>
             <div className="text-base font-bold tracking-widest font-orbitron">LEVEL {level}</div>
             <div className="text-sm font-bold text-[#0000ff] font-orbitron">{arrowsLeft} ARROWS</div>
         </div>
-        <button 
-            type="button"
-            onClick={() => openModal('faq')}
-            className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
-        >
+        <button type="button" onClick={() => openModal('faq')} className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border pointer-events-auto active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
         </button>
       </div>
 
-      <canvas 
-        ref={canvasRef} 
-        className="block w-full h-full touch-none select-none"
-        onPointerDown={handlePointerDown}
-      />
+      <canvas ref={canvasRef} className="block w-full h-full touch-none select-none" onPointerDown={handlePointerDown} />
 
-      {/* Modals Overlay */}
+      {/* Modals */}
       <div className={`absolute top-0 left-0 w-full h-full bg-black/60 backdrop-blur-sm flex flex-col justify-end transition-opacity duration-300 z-20 ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <div className={`
-            transform transition-transform duration-300 border-t shadow-2xl flex flex-col w-full
+            text-center transform transition-transform duration-300 border-t shadow-2xl flex flex-col w-full
             ${showLeaderboard ? 'h-full pt-[calc(20px+env(safe-area-inset-top))] rounded-none justify-start' : 'rounded-t-3xl p-6 pb-10 justify-end'}
             ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'translate-y-0' : 'translate-y-full'} 
             ${currentTheme === 'light' ? 'bg-white border-blue-100' : 'bg-[#1a1a1a] border-white/10'}
@@ -646,7 +627,6 @@ export default function Game() {
             {showLeaderboard && (
                 <div className="flex flex-col h-full px-5 pb-8">
                     <h2 className={`font-orbitron text-2xl font-black mb-4 uppercase flex-shrink-0 text-center ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>LEADERBOARD</h2>
-                    
                     <div className={`flex-1 overflow-y-auto mb-4 font-roboto text-left ${currentTheme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
                         {isLoadingLeaderboard ? (
                             <div className="flex justify-center items-center h-full">
@@ -658,18 +638,14 @@ export default function Game() {
                                     <div key={i} className={`flex justify-between items-center p-3 rounded-xl border ${item.isCurrentUser ? 'border-[#0000ff] bg-blue-500/10' : (currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10')}`}>
                                         <div className="flex items-center gap-3">
                                             <div className="text-lg font-black text-[#0000ff] w-6 flex-shrink-0">#{i + 1}</div>
-                                            
-                                            {/* Identity Component for automatic Basename/ENS resolution */}
                                             <div className="flex flex-col overflow-hidden">
-                                                <Identity 
-                                                    address={item.address as `0x${string}`} 
-                                                    schemaId="0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9"
-                                                    className="flex items-center gap-2"
-                                                >
-                                                    <Avatar className="w-5 h-5 rounded-full" />
-                                                    <Name className={`text-sm font-bold truncate ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`} />
-                                                </Identity>
-                                                <span className="text-[10px] opacity-50 uppercase">Token #{item.tokenId}</span>
+                                                <span className={`text-sm font-bold truncate ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`}>
+                                                  {item.isCurrentUser && frameContext?.user?.username 
+                                                    ? frameContext.user.username 
+                                                    : `${item.address.slice(0, 6)}...${item.address.slice(-4)}`
+                                                  }
+                                                </span>
+                                                <span className="text-xs opacity-50">Token ID: {item.tokenId}</span>
                                             </div>
                                         </div>
                                         <div className="text-[#0000ff] font-black text-xl flex-shrink-0">LVL {item.level}</div>
@@ -716,7 +692,6 @@ export default function Game() {
                             </button>
                         </>
                     )}
-
                     {isLevelComplete && (
                         <>
                             <h2 className={`font-orbitron text-2xl font-black mb-2 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>LEVEL COMPLETE!</h2>
@@ -726,7 +701,6 @@ export default function Game() {
                             </button>
                         </>
                     )}
-
                     {showFaq && (
                         <>
                             <h2 className={`font-orbitron text-2xl font-black mb-6 uppercase ${currentTheme === 'light' ? 'text-black' : 'text-white'}`}>GAME RULES</h2>
@@ -745,12 +719,10 @@ export default function Game() {
                             </button>
                         </>
                     )}
-                </>
+                </div>
             )}
-
         </div>
       </div>
-
     </div>
   );
 }
