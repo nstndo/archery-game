@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient, useReadContract } from 'wagmi';
 import { base } from 'viem/chains';
 import sdk, { type FrameContext } from '@farcaster/frame-sdk';
 
@@ -37,7 +37,7 @@ const CONTRACT_ABI = [
 // ADDRESS
 const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9"; 
 
-// --- Types ---
+// --- Типы ---
 interface Arrow {
   angle: number;
 }
@@ -71,11 +71,21 @@ export default function Game() {
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
-  const publicClient = usePublicClient();
   
   // Mint Hooks
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+
+  // Leaderboard Read Hook
+  const { data: rawLeaderboard, refetch: refetchLeaderboard, isLoading: isReadingLeaderboard } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'getLeaderboard',
+    chainId: base.id, 
+    query: {
+        enabled: false, 
+    }
+  });
 
   // UI State
   const [level, setLevel] = useState(1);
@@ -103,6 +113,9 @@ export default function Game() {
   const currentSpeed = useRef(0.04);
   const targetSpeed = useRef(0.04);
   const rotationChangeTimer = useRef(0);
+  
+  // Screen Dimensions Ref (updated by ResizeObserver)
+  const screenDims = useRef({ width: 0, height: 0 });
 
   const assets = useRef({
     target: null as HTMLImageElement | null,
@@ -145,7 +158,23 @@ export default function Game() {
     assets.current.shardAse_Blue = loadImg('https://base-archery-game.vercel.app/ase-blue.webp');
   }, []);
 
-  // Main Game Loop
+  // Leaderboard Data Processing
+  useEffect(() => {
+    if (rawLeaderboard) {
+        const formatted: LeaderboardEntry[] = (rawLeaderboard as any[]).map((item) => ({
+            address: item.wallet,
+            level: Number(item.maxLevel),
+            tokenId: item.tokenId.toString(),
+            isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
+        }));
+        
+        formatted.sort((a, b) => b.level - a.level);
+        setLeaderboardData(formatted);
+        setIsLoadingLeaderboard(false);
+    }
+  }, [rawLeaderboard, address]);
+
+  // Main Game Loop & Resize Observer
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -153,30 +182,32 @@ export default function Game() {
     if (!ctx) return;
 
     let animationFrameId: number;
-    let width = 0;
-    let height = 0;
     let targetRadius = 90;
     const arrowLength = 65;
 
-    const handleResize = () => {
-      // FIX: Use window dimensions directly for canvas to ensure full coverage
-      width = window.innerWidth;
-      height = window.innerHeight;
-      
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-      
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.scale(dpr, dpr);
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
+    // Use ResizeObserver for robust sizing on all devices
+    const resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+            // Get accurate dimensions from the container
+            const { width, height } = entry.contentRect;
+            screenDims.current = { width, height };
 
-      targetRadius = width < 380 ? 80 : 90;
-    };
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(dpr, dpr);
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
 
-    window.addEventListener('resize', handleResize);
-    handleResize();
+            targetRadius = width < 380 ? 80 : 90;
+        }
+    });
+
+    if (containerRef.current) {
+        resizeObserver.observe(containerRef.current);
+    }
 
     const drawArrow = (x: number, y: number, angle?: number, isStuck = false) => {
       ctx.save();
@@ -289,9 +320,14 @@ export default function Game() {
     };
 
     const loop = () => {
+      const { width, height } = screenDims.current;
+      if (width === 0 || height === 0) {
+        animationFrameId = requestAnimationFrame(loop);
+        return;
+      }
+
       ctx.clearRect(0, 0, width, height);
       const centerX = width / 2;
-      // FIX: Moved centerY down to 0.45 to prevent arrows hitting UI
       const centerY = height * 0.45;
       const startArrowY = height * 0.85;
 
@@ -364,8 +400,6 @@ export default function Game() {
                     stuckArrows.current.push({ angle: hitAngle });
                     flyingArrow.current = null;
                     spawnHitParticles(centerX, impactY);
-                    
-                    // React State Update for UI
                     setArrowsLeft(prev => {
                         const newVal = prev - 1;
                         if (newVal <= 0) {
@@ -392,7 +426,7 @@ export default function Game() {
     loop();
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      if (containerRef.current) resizeObserver.unobserve(containerRef.current);
       cancelAnimationFrame(animationFrameId);
     };
   }, [level, arrowsLeft, currentTheme]);
@@ -400,14 +434,12 @@ export default function Game() {
   // --- Actions ---
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeft <= 0) return;
-    // Calculate start position relative to window height
-    const h = window.innerHeight; 
+    const h = screenDims.current.height; 
     flyingArrow.current = { y: h * 0.85 };
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
-    // FIX: Check for clicks on UI elements to prevent unwanted shooting
     if (target.closest('button') || target.closest('.modal-card') || target.closest('.top-bar') || target.closest('.game-stats')) {
         return;
     }
@@ -452,32 +484,12 @@ export default function Game() {
     if (gameState.current === 'paused') gameState.current = 'playing';
   };
 
-  // --- FIXED LEADERBOARD FETCH (NO WAGMI HOOK, RAW CLIENT CALL) ---
   const fetchLeaderboard = async () => {
-    if (!publicClient) return;
-    
     setIsLoadingLeaderboard(true);
-    setLeaderboardData([]); 
-    
     try {
-        const data = await publicClient.readContract({
-            address: CONTRACT_ADDRESS,
-            abi: CONTRACT_ABI,
-            functionName: 'getLeaderboard',
-        }) as any[];
-
-        const formatted: LeaderboardEntry[] = data.map((item) => ({
-            address: item.wallet,
-            level: Number(item.maxLevel),
-            tokenId: item.tokenId.toString(),
-            isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
-        }));
-        
-        formatted.sort((a, b) => b.level - a.level);
-        setLeaderboardData(formatted);
+        await refetchLeaderboard();
     } catch (e) {
         console.error("Fetch leaderboard error", e);
-    } finally {
         setIsLoadingLeaderboard(false);
     }
   };
@@ -514,7 +526,6 @@ export default function Game() {
     });
   };
 
-  // --- SHARE FUNCTION ---
   const handleShare = () => {
     const text = encodeURIComponent(`I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`);
     const embed = encodeURIComponent('https://base-archery-game.vercel.app'); 
@@ -531,7 +542,7 @@ export default function Game() {
     window.open(shareUrl, '_blank');
   };
 
-  // --- RENDER PROFILE ---
+  // Render Profile
   const renderProfile = () => {
     if (frameContext?.user) {
         return (
@@ -610,7 +621,7 @@ export default function Game() {
             </div>
         </div>
 
-        {/* Stats Overlay */}
+        {/* Stats Overlay - FIXED WIDTH for stability */}
         <div className="game-stats w-full flex justify-center items-center gap-4 px-5 mt-4 pointer-events-auto">
             <button 
                 type="button"
@@ -619,10 +630,13 @@ export default function Game() {
             >
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
             </button>
-            <div className={`px-5 py-2 rounded-2xl border backdrop-blur-sm text-center min-w-[120px] ${currentTheme === 'light' ? 'bg-blue-50/80 border-blue-200' : 'bg-black/50 border-white/10'}`}>
-                <div className="text-base font-bold tracking-widest font-orbitron">LEVEL {level}</div>
-                <div className="text-sm font-bold text-[#0000ff] font-orbitron">{arrowsLeft} ARROWS</div>
+            
+            {/* FIXED WIDTH CONTAINER */}
+            <div className={`w-36 h-14 flex flex-col justify-center items-center rounded-2xl border backdrop-blur-sm text-center ${currentTheme === 'light' ? 'bg-blue-50/80 border-blue-200' : 'bg-black/50 border-white/10'}`}>
+                <div className="text-base font-bold tracking-widest font-orbitron leading-none mb-1">LEVEL {level}</div>
+                <div className="text-xs font-bold text-[#0000ff] font-orbitron leading-none">{arrowsLeft} ARROWS</div>
             </div>
+
             <button 
                 type="button"
                 onClick={() => openModal('faq')}
