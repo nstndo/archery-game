@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient, useReadContract } from 'wagmi';
 import { base } from 'viem/chains';
-import sdk, { type FrameContext } from '@farcaster/frame-sdk';
-import { useComposeCast } from '@coinbase/onchainkit/minikit';
+import { sdk } from '@farcaster/miniapp-sdk';
 
 // --- ABI ---
 const CONTRACT_ABI = [
@@ -101,10 +100,6 @@ export default function Game() {
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
-  
-  // Farcaster/Base App Context State
-  const [frameContext, setFrameContext] = useState<FrameContext | null>(null);
-  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
 
   // Game Logic Refs
   const gameState = useRef<'playing' | 'gameover' | 'level_complete' | 'paused'>('playing');
@@ -554,11 +549,15 @@ export default function Game() {
     });
   };
 
-  const handleShare = () => {
-  composeCast({
-    text: `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`,
-    embeds: [window.location.href]
-  });
+  const handleShare = async () => {
+  try {
+    await sdk.actions.composeCast({
+      text: `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score?`,
+      embeds: [window.location.href],
+    });
+  } catch (e) {
+    console.error('Share failed', e);
+  }
 };
 
 
