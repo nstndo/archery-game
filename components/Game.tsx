@@ -72,7 +72,6 @@ export default function Game() {
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
   const publicClient = usePublicClient();
-  const { composeCast } = useComposeCast();
   
   // Mint Hooks
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
@@ -559,8 +558,6 @@ export default function Game() {
     console.error('Share failed', e);
   }
 };
-
-
 
   // Render Profile
   const renderProfile = () => {
