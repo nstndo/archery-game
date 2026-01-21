@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient, useReadContract } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
 import { base } from 'viem/chains';
 import sdk, { type FrameContext } from '@farcaster/frame-sdk';
 import { Avatar, Name, Identity } from '@coinbase/onchainkit/identity';
 
-// --- ABI  ---
+// --- ABI ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -72,21 +72,11 @@ export default function Game() {
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
+  const publicClient = usePublicClient();
   
   // Mint Hooks
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
-
-  // Leaderboard Read Hook
-  const { data: rawLeaderboard, refetch: refetchLeaderboard, isLoading: isReadingLeaderboard } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: 'getLeaderboard',
-    chainId: base.id, 
-    query: {
-        enabled: false, 
-    }
-  });
 
   // UI State
   const [level, setLevel] = useState(1);
@@ -109,6 +99,8 @@ export default function Game() {
   const stuckArrows = useRef<Arrow[]>([]);
   const flyingArrow = useRef<{ y: number } | null>(null);
   const particles = useRef<Particle[]>([]);
+  // FIX: Added missing ref for arrows logic
+  const arrowsLeftRef = useRef(10); 
   
   const rotation = useRef(0);
   const currentSpeed = useRef(0.04);
@@ -159,22 +151,6 @@ export default function Game() {
     assets.current.shardAse_Blue = loadImg('https://base-archery-game.vercel.app/ase-blue.webp');
   }, []);
 
-  // Leaderboard Data Processing
-  useEffect(() => {
-    if (rawLeaderboard) {
-        const formatted: LeaderboardEntry[] = (rawLeaderboard as any[]).map((item) => ({
-            address: item.wallet,
-            level: Number(item.maxLevel),
-            tokenId: item.tokenId.toString(),
-            isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
-        }));
-        
-        formatted.sort((a, b) => b.level - a.level);
-        setLeaderboardData(formatted);
-        setIsLoadingLeaderboard(false);
-    }
-  }, [rawLeaderboard, address]);
-
   // Main Game Loop & Resize Observer
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -200,7 +176,6 @@ export default function Game() {
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
 
-            // Slightly reduced target radius
             targetRadius = width < 380 ? 75 : 85;
         }
     });
@@ -328,9 +303,7 @@ export default function Game() {
 
       ctx.clearRect(0, 0, width, height);
       const centerX = width / 2;
-      // Target slightly raised to 0.33 to clear space but not overlap top UI
-      const centerY = height * 0.33; 
-      // Arrow start point lowered to 0.9 (minimal gap from bottom)
+      const centerY = height * 0.45;
       const startArrowY = height * 0.9;
 
       // Draw Target
@@ -403,7 +376,7 @@ export default function Game() {
                     flyingArrow.current = null;
                     spawnHitParticles(centerX, impactY);
                     
-                    // Logic update via REF to avoid re-renders
+                    // Logic update via REF to avoid re-renders (FIXED FLICKER)
                     arrowsLeftRef.current -= 1;
                     setArrowsLeft(arrowsLeftRef.current);
                     
@@ -432,13 +405,14 @@ export default function Game() {
       if (containerRef.current) resizeObserver.unobserve(containerRef.current);
       cancelAnimationFrame(animationFrameId);
     };
+  // FIX: Removed arrowsLeft from dependency array to stop useEffect restart on shoot
   }, [level, currentTheme]);
 
   // --- Actions ---
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeftRef.current <= 0) return;
     const h = screenDims.current.height; 
-    flyingArrow.current = { y: h * 0.9 }; // Match startArrowY logic
+    flyingArrow.current = { y: h * 0.9 };
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -489,12 +463,32 @@ export default function Game() {
     if (gameState.current === 'paused') gameState.current = 'playing';
   };
 
+  // --- FIXED LEADERBOARD FETCH (NO WAGMI HOOK, RAW CLIENT CALL) ---
   const fetchLeaderboard = async () => {
+    if (!publicClient) return;
+    
     setIsLoadingLeaderboard(true);
+    setLeaderboardData([]); 
+    
     try {
-        await refetchLeaderboard();
+        const data = await publicClient.readContract({
+            address: CONTRACT_ADDRESS,
+            abi: CONTRACT_ABI,
+            functionName: 'getLeaderboard',
+        }) as any[];
+
+        const formatted: LeaderboardEntry[] = data.map((item) => ({
+            address: item.wallet,
+            level: Number(item.maxLevel),
+            tokenId: item.tokenId.toString(),
+            isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
+        }));
+        
+        formatted.sort((a, b) => b.level - a.level);
+        setLeaderboardData(formatted);
     } catch (e) {
         console.error("Fetch leaderboard error", e);
+    } finally {
         setIsLoadingLeaderboard(false);
     }
   };
