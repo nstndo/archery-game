@@ -14,7 +14,7 @@
     "buttonTitle": "Play Archery",
     "splashBackgroundColor": "#ffffff",
     "webhookUrl": "https://base-archery-game.vercel.app/api/webhook",
-    "subtitle": "Base Archery: Hit the History.",
+    "subtitle": "Base Archery: Hit the History",
     "description": "An addictive precision arcade game on the Base network. Clear as many levels as possible without hitting other arrows.",
     "screenshotUrls": [
       "https://base-archery-game.vercel.app/scr1.png",
@@ -40,7 +40,7 @@
     "buttonTitle": "Play Archery",
     "splashBackgroundColor": "#ffffff",
     "webhookUrl": "https://base-archery-game.vercel.app/api/webhook",
-    "subtitle": "Base Archery: Hit the History.",
+    "subtitle": "Base Archery: Hit the History",
     "description": "An addictive precision arcade game on the Base network. Clear as many levels as possible without hitting other arrows.",
     "screenshotUrls": [
       "https://base-archery-game.vercel.app/scr1.png",
@@ -49,7 +49,7 @@
     ],
     "primaryCategory": "games",
     "tags": ["game", "miniapp", "casual"],
-    "heroImageUrl": "https://base-archery-game.vercel.app/opengraph-image.png",
+    "heroImageUrl": "https://base-archery-game.vercel.app/logo.png",
     "tagline": "Become a Base Legend",
     "ogTitle": "Base Archery",
     "ogDescription": "An addictive precision arcade game on the Base network.",
