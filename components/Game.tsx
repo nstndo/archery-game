@@ -1,12 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient, useReadContract } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
 import { base } from 'viem/chains';
 import sdk, { type FrameContext } from '@farcaster/frame-sdk';
-import { Avatar, Name, Identity } from '@coinbase/onchainkit/identity';
 
-// --- ABI Смарт-контракта ---
+// --- ABI ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -35,7 +34,7 @@ const CONTRACT_ABI = [
   }
 ] as const;
 
-// ADRESS
+// ADDRESS
 const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9"; 
 
 // --- Types ---
@@ -72,21 +71,11 @@ export default function Game() {
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
+  const publicClient = usePublicClient();
   
   // Mint Hooks
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
-
-  // Leaderboard Read Hook
-  const { data: rawLeaderboard, refetch: refetchLeaderboard, isLoading: isReadingLeaderboard } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: 'getLeaderboard',
-    chainId: base.id, 
-    query: {
-        enabled: false, 
-    }
-  });
 
   // UI State
   const [level, setLevel] = useState(1);
@@ -156,22 +145,6 @@ export default function Game() {
     assets.current.shardAse_Blue = loadImg('https://base-archery-game.vercel.app/ase-blue.webp');
   }, []);
 
-  // Leaderboard Data Processing
-  useEffect(() => {
-    if (rawLeaderboard) {
-        const formatted: LeaderboardEntry[] = (rawLeaderboard as any[]).map((item) => ({
-            address: item.wallet,
-            level: Number(item.maxLevel),
-            tokenId: item.tokenId.toString(),
-            isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
-        }));
-        
-        formatted.sort((a, b) => b.level - a.level);
-        setLeaderboardData(formatted);
-        setIsLoadingLeaderboard(false);
-    }
-  }, [rawLeaderboard, address]);
-
   // Main Game Loop
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -186,15 +159,9 @@ export default function Game() {
     const arrowLength = 65;
 
     const handleResize = () => {
-      // FIX: Use container dimensions instead of window to prevent squashing on desktop
-      const container = containerRef.current;
-      if (container) {
-        width = container.clientWidth;
-        height = container.clientHeight;
-      } else {
-        width = window.innerWidth;
-        height = window.innerHeight;
-      }
+      // FIX: Use window dimensions directly for canvas to ensure full coverage
+      width = window.innerWidth;
+      height = window.innerHeight;
       
       const dpr = window.devicePixelRatio || 1;
       canvas.width = width * dpr;
@@ -324,8 +291,9 @@ export default function Game() {
     const loop = () => {
       ctx.clearRect(0, 0, width, height);
       const centerX = width / 2;
-      const centerY = height * 0.35;
-      const startArrowY = height * 0.82;
+      // FIX: Moved centerY down to 0.45 to prevent arrows hitting UI
+      const centerY = height * 0.45;
+      const startArrowY = height * 0.85;
 
       // Draw Target
       ctx.save();
@@ -396,6 +364,8 @@ export default function Game() {
                     stuckArrows.current.push({ angle: hitAngle });
                     flyingArrow.current = null;
                     spawnHitParticles(centerX, impactY);
+                    
+                    // React State Update for UI
                     setArrowsLeft(prev => {
                         const newVal = prev - 1;
                         if (newVal <= 0) {
@@ -430,15 +400,15 @@ export default function Game() {
   // --- Actions ---
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeft <= 0) return;
-    // Fix: Use container height for shoot logic too, to keep in sync with visual
-    const h = containerRef.current?.clientHeight || window.innerHeight;
-    flyingArrow.current = { y: h * 0.82 };
+    // Calculate start position relative to window height
+    const h = window.innerHeight; 
+    flyingArrow.current = { y: h * 0.85 };
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
-    // Check if clicked element is a button or modal content
-    if (target.closest('button') || target.closest('.modal-card')) {
+    // FIX: Check for clicks on UI elements to prevent unwanted shooting
+    if (target.closest('button') || target.closest('.modal-card') || target.closest('.top-bar') || target.closest('.game-stats')) {
         return;
     }
     e.preventDefault();
@@ -482,12 +452,32 @@ export default function Game() {
     if (gameState.current === 'paused') gameState.current = 'playing';
   };
 
+  // --- FIXED LEADERBOARD FETCH (NO WAGMI HOOK, RAW CLIENT CALL) ---
   const fetchLeaderboard = async () => {
+    if (!publicClient) return;
+    
     setIsLoadingLeaderboard(true);
+    setLeaderboardData([]); 
+    
     try {
-        await refetchLeaderboard();
+        const data = await publicClient.readContract({
+            address: CONTRACT_ADDRESS,
+            abi: CONTRACT_ABI,
+            functionName: 'getLeaderboard',
+        }) as any[];
+
+        const formatted: LeaderboardEntry[] = data.map((item) => ({
+            address: item.wallet,
+            level: Number(item.maxLevel),
+            tokenId: item.tokenId.toString(),
+            isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
+        }));
+        
+        formatted.sort((a, b) => b.level - a.level);
+        setLeaderboardData(formatted);
     } catch (e) {
         console.error("Fetch leaderboard error", e);
+    } finally {
         setIsLoadingLeaderboard(false);
     }
   };
@@ -524,6 +514,7 @@ export default function Game() {
     });
   };
 
+  // --- SHARE FUNCTION ---
   const handleShare = () => {
     const text = encodeURIComponent(`I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`);
     const embed = encodeURIComponent('https://base-archery-game.vercel.app'); 
@@ -540,7 +531,7 @@ export default function Game() {
     window.open(shareUrl, '_blank');
   };
 
-  // Render Profile
+  // --- RENDER PROFILE ---
   const renderProfile = () => {
     if (frameContext?.user) {
         return (
@@ -564,7 +555,7 @@ export default function Game() {
             <button
                 type="button" 
                 onClick={() => disconnect()}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border border-current transition-all active:scale-95 max-w-[140px] hover:opacity-70`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all active:scale-95 max-w-[140px] hover:opacity-70 ${currentTheme === 'light' ? 'border-gray-300' : 'border-white/20'}`}
             >
                 <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex-shrink-0" />
                 <span className="font-bold text-xs tracking-wide truncate">
@@ -578,7 +569,7 @@ export default function Game() {
         <button 
             type="button"
             onClick={handleConnect}
-            className={`px-4 py-2 rounded-2xl font-bold text-xs tracking-widest font-orbitron transition-all active:scale-95 border border-current hover:opacity-70`}
+            className={`px-4 py-2 rounded-2xl font-bold text-xs tracking-widest font-orbitron transition-all active:scale-95 border hover:opacity-70 ${currentTheme === 'light' ? 'border-gray-300' : 'border-white/20'}`}
         >
             CONNECT
         </button>
@@ -603,7 +594,7 @@ export default function Game() {
       <div className="relative z-10 flex flex-col h-full pointer-events-none">
         
         {/* Top Bar */}
-        <div className={`flex justify-between items-center px-4 py-4 pt-[calc(15px+env(safe-area-inset-top))] backdrop-blur-md border-b transition-colors duration-300 flex-shrink-0 pointer-events-auto ${currentTheme === 'light' ? 'bg-white/85 border-blue-600/10' : 'bg-[#000020]/85 border-white/10'}`}>
+        <div className={`top-bar flex justify-between items-center px-4 py-4 pt-[calc(15px+env(safe-area-inset-top))] backdrop-blur-md border-b transition-colors duration-300 flex-shrink-0 pointer-events-auto ${currentTheme === 'light' ? 'bg-white/85 border-blue-600/10' : 'bg-[#000020]/85 border-white/10'}`}>
             <div className="font-orbitron font-black text-lg flex items-center gap-2 uppercase tracking-wide flex-shrink-0">
             BASE <span className="text-[#0000ff]">ARCHERY</span>
             </div>
@@ -620,7 +611,7 @@ export default function Game() {
         </div>
 
         {/* Stats Overlay */}
-        <div className="w-full flex justify-center items-center gap-4 px-5 mt-4 pointer-events-auto">
+        <div className="game-stats w-full flex justify-center items-center gap-4 px-5 mt-4 pointer-events-auto">
             <button 
                 type="button"
                 onClick={() => openModal('leaderboard')}
@@ -666,17 +657,13 @@ export default function Game() {
                                     <div key={i} className={`flex justify-between items-center p-3 rounded-xl border ${item.isCurrentUser ? 'border-[#0000ff] bg-blue-500/10' : (currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10')}`}>
                                         <div className="flex items-center gap-3">
                                             <div className="text-lg font-black text-[#0000ff] w-6 flex-shrink-0">#{i + 1}</div>
-                                            
-                                            {/* Identity Component for automatic Basename/ENS resolution */}
                                             <div className="flex flex-col overflow-hidden">
-                                                <Identity 
-                                                    address={item.address as `0x${string}`} 
-                                                    schemaId="0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9"
-                                                    className="flex items-center gap-2"
-                                                >
-                                                    <Avatar className="w-5 h-5 rounded-full" />
-                                                    <Name className={`text-sm font-bold truncate ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`} />
-                                                </Identity>
+                                                <span className={`text-sm font-bold truncate ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`}>
+                                                  {item.isCurrentUser && frameContext?.user?.username 
+                                                    ? frameContext.user.username 
+                                                    : `${item.address.slice(0, 6)}...${item.address.slice(-4)}`
+                                                  }
+                                                </span>
                                                 <span className="text-xs opacity-50">Token ID: {item.tokenId}</span>
                                             </div>
                                         </div>
