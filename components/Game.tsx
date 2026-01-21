@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient, useReadContract } from 'wagmi';
 import { base } from 'viem/chains';
 import sdk, { type FrameContext } from '@farcaster/frame-sdk';
+import { useComposeCast } from '@coinbase/onchainkit/minikit';
 
 // --- ABI ---
 const CONTRACT_ABI = [
@@ -552,26 +553,15 @@ export default function Game() {
     });
   };
 
+  const { composeCast } = useComposeCast();
+  
   const handleShare = () => {
-  const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`;
-  const embeds = ["https://base-archery-game.vercel.app"];
-
-  const encodedText = encodeURIComponent(text);
-  const encodedEmbed = encodeURIComponent(embeds[0]);
-
-  const shareUrl = `https://warpcast.com/~/compose?text=${encodedText}&embeds[]=${encodedEmbed}`;
-
-  if (isSDKLoaded && sdk.actions?.openUrl) {
-    try {
-      sdk.actions.openUrl(shareUrl);
-      return;
-    } catch (e) {
-      console.error("openUrl failed", e);
-    }
-  }
-
-  window.open(shareUrl, '_blank');
+  composeCast({
+    text: `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`,
+    embeds: [window.location.href]
+  });
 };
+
 
 
   // Render Profile
