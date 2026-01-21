@@ -556,21 +556,20 @@ export default function Game() {
   const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`;
   const embeds = ["https://base-archery-game.vercel.app"];
 
-  if (isSDKLoaded && sdk.actions?.composeCast) {
+  const encodedText = encodeURIComponent(text);
+  const encodedEmbed = encodeURIComponent(embeds[0]);
+
+  const shareUrl = `https://warpcast.com/~/compose?text=${encodedText}&embeds[]=${encodedEmbed}`;
+
+  if (isSDKLoaded && sdk.actions?.openUrl) {
     try {
-      sdk.actions.composeCast({
-        text,
-        embeds,
-      });
+      sdk.actions.openUrl(shareUrl);
       return;
     } catch (e) {
-      console.error("composeCast failed", e);
+      console.error("openUrl failed", e);
     }
   }
 
-  const encodedText = encodeURIComponent(text);
-  const encodedEmbed = encodeURIComponent(embeds[0]);
-  const shareUrl = `https://warpcast.com/~/compose?text=${encodedText}&embeds[]=${encodedEmbed}`;
   window.open(shareUrl, '_blank');
 };
 
