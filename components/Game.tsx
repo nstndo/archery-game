@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient, useReadContract } from 'wagmi';
 import { base } from 'viem/chains';
 import sdk, { type FrameContext } from '@farcaster/frame-sdk';
+import { Avatar, Name, Identity } from '@coinbase/onchainkit/identity';
 
-// --- ABI ---
+// --- ABI  ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -71,11 +72,21 @@ export default function Game() {
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
-  const publicClient = usePublicClient();
   
   // Mint Hooks
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+
+  // Leaderboard Read Hook
+  const { data: rawLeaderboard, refetch: refetchLeaderboard, isLoading: isReadingLeaderboard } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'getLeaderboard',
+    chainId: base.id, 
+    query: {
+        enabled: false, 
+    }
+  });
 
   // UI State
   const [level, setLevel] = useState(1);
@@ -98,7 +109,6 @@ export default function Game() {
   const stuckArrows = useRef<Arrow[]>([]);
   const flyingArrow = useRef<{ y: number } | null>(null);
   const particles = useRef<Particle[]>([]);
-  const arrowsLeftRef = useRef(10); // Ref to avoid re-renders in loop
   
   const rotation = useRef(0);
   const currentSpeed = useRef(0.04);
@@ -149,6 +159,22 @@ export default function Game() {
     assets.current.shardAse_Blue = loadImg('https://base-archery-game.vercel.app/ase-blue.webp');
   }, []);
 
+  // Leaderboard Data Processing
+  useEffect(() => {
+    if (rawLeaderboard) {
+        const formatted: LeaderboardEntry[] = (rawLeaderboard as any[]).map((item) => ({
+            address: item.wallet,
+            level: Number(item.maxLevel),
+            tokenId: item.tokenId.toString(),
+            isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
+        }));
+        
+        formatted.sort((a, b) => b.level - a.level);
+        setLeaderboardData(formatted);
+        setIsLoadingLeaderboard(false);
+    }
+  }, [rawLeaderboard, address]);
+
   // Main Game Loop & Resize Observer
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -174,7 +200,8 @@ export default function Game() {
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
 
-            targetRadius = width < 380 ? 80 : 90;
+            // Slightly reduced target radius
+            targetRadius = width < 380 ? 75 : 85;
         }
     });
 
@@ -301,9 +328,10 @@ export default function Game() {
 
       ctx.clearRect(0, 0, width, height);
       const centerX = width / 2;
-      // FIX: Move target down to 0.45 to prevent arrows hiding behind UI
-      const centerY = height * 0.45; 
-      const startArrowY = height * 0.85;
+      // Target slightly raised to 0.33 to clear space but not overlap top UI
+      const centerY = height * 0.33; 
+      // Arrow start point lowered to 0.9 (minimal gap from bottom)
+      const startArrowY = height * 0.9;
 
       // Draw Target
       ctx.save();
@@ -320,6 +348,7 @@ export default function Game() {
         ctx.lineWidth = 2;
         ctx.stroke();
       } else {
+        // Fallback target
         ctx.beginPath();
         ctx.arc(0, 0, targetRadius, 0, Math.PI * 2);
         ctx.fillStyle = '#0000ff';
@@ -350,6 +379,7 @@ export default function Game() {
         rotation.current += currentSpeed.current;
 
         if (flyingArrow.current) {
+            // Speed increased from 25 to 40
             flyingArrow.current.y -= 40;
             const impactY = centerY + targetRadius;
 
@@ -402,13 +432,13 @@ export default function Game() {
       if (containerRef.current) resizeObserver.unobserve(containerRef.current);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [level, currentTheme]); // Removed arrowsLeft from dependency to fix flicker
+  }, [level, currentTheme]);
 
   // --- Actions ---
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeftRef.current <= 0) return;
     const h = screenDims.current.height; 
-    flyingArrow.current = { y: h * 0.85 };
+    flyingArrow.current = { y: h * 0.9 }; // Match startArrowY logic
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -460,30 +490,11 @@ export default function Game() {
   };
 
   const fetchLeaderboard = async () => {
-    if (!publicClient) return;
-    
     setIsLoadingLeaderboard(true);
-    setLeaderboardData([]); 
-    
     try {
-        const data = await publicClient.readContract({
-            address: CONTRACT_ADDRESS,
-            abi: CONTRACT_ABI,
-            functionName: 'getLeaderboard',
-        }) as any[];
-
-        const formatted: LeaderboardEntry[] = data.map((item) => ({
-            address: item.wallet,
-            level: Number(item.maxLevel),
-            tokenId: item.tokenId.toString(),
-            isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
-        }));
-        
-        formatted.sort((a, b) => b.level - a.level);
-        setLeaderboardData(formatted);
+        await refetchLeaderboard();
     } catch (e) {
         console.error("Fetch leaderboard error", e);
-    } finally {
         setIsLoadingLeaderboard(false);
     }
   };
@@ -663,13 +674,17 @@ export default function Game() {
                                     <div key={i} className={`flex justify-between items-center p-3 rounded-xl border ${item.isCurrentUser ? 'border-[#0000ff] bg-blue-500/10' : (currentTheme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10')}`}>
                                         <div className="flex items-center gap-3">
                                             <div className="text-lg font-black text-[#0000ff] w-6 flex-shrink-0">#{i + 1}</div>
+                                            
+                                            {/* Identity Component for automatic Basename/ENS resolution */}
                                             <div className="flex flex-col overflow-hidden">
-                                                <span className={`text-sm font-bold truncate ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`}>
-                                                  {item.isCurrentUser && frameContext?.user?.username 
-                                                    ? frameContext.user.username 
-                                                    : `${item.address.slice(0, 6)}...${item.address.slice(-4)}`
-                                                  }
-                                                </span>
+                                                <Identity 
+                                                    address={item.address as `0x${string}`} 
+                                                    schemaId="0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9"
+                                                    className="flex items-center gap-2"
+                                                >
+                                                    <Avatar className="w-5 h-5 rounded-full" />
+                                                    <Name className={`text-sm font-bold truncate ${item.isCurrentUser ? 'text-[#0000ff]' : ''}`} />
+                                                </Identity>
                                                 <span className="text-xs opacity-50">Token ID: {item.tokenId}</span>
                                             </div>
                                         </div>
