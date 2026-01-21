@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient, useReadContract } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
 import { base } from 'viem/chains';
 import sdk, { type FrameContext } from '@farcaster/frame-sdk';
 
@@ -37,7 +37,7 @@ const CONTRACT_ABI = [
 // ADDRESS
 const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9"; 
 
-// --- Типы ---
+// --- Types ---
 interface Arrow {
   angle: number;
 }
@@ -71,21 +71,11 @@ export default function Game() {
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
+  const publicClient = usePublicClient();
   
   // Mint Hooks
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
-
-  // Leaderboard Read Hook
-  const { data: rawLeaderboard, refetch: refetchLeaderboard, isLoading: isReadingLeaderboard } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: 'getLeaderboard',
-    chainId: base.id, 
-    query: {
-        enabled: false, 
-    }
-  });
 
   // UI State
   const [level, setLevel] = useState(1);
@@ -108,13 +98,14 @@ export default function Game() {
   const stuckArrows = useRef<Arrow[]>([]);
   const flyingArrow = useRef<{ y: number } | null>(null);
   const particles = useRef<Particle[]>([]);
+  const arrowsLeftRef = useRef(10); // Ref to avoid re-renders in loop
   
   const rotation = useRef(0);
   const currentSpeed = useRef(0.04);
   const targetSpeed = useRef(0.04);
   const rotationChangeTimer = useRef(0);
   
-  // Screen Dimensions Ref (updated by ResizeObserver)
+  // Screen Dimensions Ref
   const screenDims = useRef({ width: 0, height: 0 });
 
   const assets = useRef({
@@ -158,22 +149,6 @@ export default function Game() {
     assets.current.shardAse_Blue = loadImg('https://base-archery-game.vercel.app/ase-blue.webp');
   }, []);
 
-  // Leaderboard Data Processing
-  useEffect(() => {
-    if (rawLeaderboard) {
-        const formatted: LeaderboardEntry[] = (rawLeaderboard as any[]).map((item) => ({
-            address: item.wallet,
-            level: Number(item.maxLevel),
-            tokenId: item.tokenId.toString(),
-            isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
-        }));
-        
-        formatted.sort((a, b) => b.level - a.level);
-        setLeaderboardData(formatted);
-        setIsLoadingLeaderboard(false);
-    }
-  }, [rawLeaderboard, address]);
-
   // Main Game Loop & Resize Observer
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -185,10 +160,8 @@ export default function Game() {
     let targetRadius = 90;
     const arrowLength = 65;
 
-    // Use ResizeObserver for robust sizing on all devices
     const resizeObserver = new ResizeObserver((entries) => {
         for (const entry of entries) {
-            // Get accurate dimensions from the container
             const { width, height } = entry.contentRect;
             screenDims.current = { width, height };
 
@@ -328,7 +301,8 @@ export default function Game() {
 
       ctx.clearRect(0, 0, width, height);
       const centerX = width / 2;
-      const centerY = height * 0.45;
+      // FIX: Move target down to 0.45 to prevent arrows hiding behind UI
+      const centerY = height * 0.45; 
       const startArrowY = height * 0.85;
 
       // Draw Target
@@ -346,7 +320,6 @@ export default function Game() {
         ctx.lineWidth = 2;
         ctx.stroke();
       } else {
-        // Fallback target
         ctx.beginPath();
         ctx.arc(0, 0, targetRadius, 0, Math.PI * 2);
         ctx.fillStyle = '#0000ff';
@@ -377,7 +350,6 @@ export default function Game() {
         rotation.current += currentSpeed.current;
 
         if (flyingArrow.current) {
-            // Speed increased from 25 to 40
             flyingArrow.current.y -= 40;
             const impactY = centerY + targetRadius;
 
@@ -400,14 +372,15 @@ export default function Game() {
                     stuckArrows.current.push({ angle: hitAngle });
                     flyingArrow.current = null;
                     spawnHitParticles(centerX, impactY);
-                    setArrowsLeft(prev => {
-                        const newVal = prev - 1;
-                        if (newVal <= 0) {
-                            gameState.current = 'level_complete';
-                            setIsLevelComplete(true);
-                        }
-                        return newVal;
-                    });
+                    
+                    // Logic update via REF to avoid re-renders
+                    arrowsLeftRef.current -= 1;
+                    setArrowsLeft(arrowsLeftRef.current);
+                    
+                    if (arrowsLeftRef.current <= 0) {
+                        gameState.current = 'level_complete';
+                        setIsLevelComplete(true);
+                    }
                 }
             }
         }
@@ -416,7 +389,7 @@ export default function Game() {
       // Draw Active Arrow
       if (flyingArrow.current) {
         drawArrow(centerX, flyingArrow.current.y);
-      } else if (arrowsLeft > 0 && gameState.current === 'playing') {
+      } else if (arrowsLeftRef.current > 0 && gameState.current === 'playing') {
         drawArrow(centerX, startArrowY);
       }
 
@@ -429,11 +402,11 @@ export default function Game() {
       if (containerRef.current) resizeObserver.unobserve(containerRef.current);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [level, arrowsLeft, currentTheme]);
+  }, [level, currentTheme]); // Removed arrowsLeft from dependency to fix flicker
 
   // --- Actions ---
   const shoot = () => {
-    if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeft <= 0) return;
+    if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeftRef.current <= 0) return;
     const h = screenDims.current.height; 
     flyingArrow.current = { y: h * 0.85 };
   };
@@ -449,8 +422,10 @@ export default function Game() {
 
   const resetLevel = (lvl: number) => {
     if (resetContract) resetContract(); 
+    
     setLevel(lvl);
     setArrowsLeft(10);
+    arrowsLeftRef.current = 10;
     stuckArrows.current = [];
     flyingArrow.current = null;
     particles.current = [];
@@ -485,11 +460,30 @@ export default function Game() {
   };
 
   const fetchLeaderboard = async () => {
+    if (!publicClient) return;
+    
     setIsLoadingLeaderboard(true);
+    setLeaderboardData([]); 
+    
     try {
-        await refetchLeaderboard();
+        const data = await publicClient.readContract({
+            address: CONTRACT_ADDRESS,
+            abi: CONTRACT_ABI,
+            functionName: 'getLeaderboard',
+        }) as any[];
+
+        const formatted: LeaderboardEntry[] = data.map((item) => ({
+            address: item.wallet,
+            level: Number(item.maxLevel),
+            tokenId: item.tokenId.toString(),
+            isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
+        }));
+        
+        formatted.sort((a, b) => b.level - a.level);
+        setLeaderboardData(formatted);
     } catch (e) {
         console.error("Fetch leaderboard error", e);
+    } finally {
         setIsLoadingLeaderboard(false);
     }
   };
@@ -566,7 +560,7 @@ export default function Game() {
             <button
                 type="button" 
                 onClick={() => disconnect()}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all active:scale-95 max-w-[140px] hover:opacity-70 ${currentTheme === 'light' ? 'border-gray-300' : 'border-white/20'}`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border border-current transition-all active:scale-95 max-w-[140px] hover:opacity-70 ${currentTheme === 'light' ? 'border-gray-300' : 'border-white/20'}`}
             >
                 <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex-shrink-0" />
                 <span className="font-bold text-xs tracking-wide truncate">
@@ -591,7 +585,6 @@ export default function Game() {
     <div 
         ref={containerRef}
         className={`fixed inset-0 w-full h-[100dvh] max-h-[100dvh] max-w-[480px] mx-auto flex flex-col overflow-hidden transition-colors duration-300 shadow-2xl ${currentTheme === 'light' ? 'bg-white text-black' : 'bg-[#000010] text-white'}`}
-        // ADDED onPointerDown here to capture clicks for game, preventing default only if not hitting UI
         onPointerDown={handlePointerDown}
     >
       
@@ -621,7 +614,7 @@ export default function Game() {
             </div>
         </div>
 
-        {/* Stats Overlay - FIXED WIDTH for stability */}
+        {/* Stats Overlay */}
         <div className="game-stats w-full flex justify-center items-center gap-4 px-5 mt-4 pointer-events-auto">
             <button 
                 type="button"
@@ -631,7 +624,6 @@ export default function Game() {
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
             </button>
             
-            {/* FIXED WIDTH CONTAINER */}
             <div className={`w-36 h-14 flex flex-col justify-center items-center rounded-2xl border backdrop-blur-sm text-center ${currentTheme === 'light' ? 'bg-blue-50/80 border-blue-200' : 'bg-black/50 border-white/10'}`}>
                 <div className="text-base font-bold tracking-widest font-orbitron leading-none mb-1">LEVEL {level}</div>
                 <div className="text-xs font-bold text-[#0000ff] font-orbitron leading-none">{arrowsLeft} ARROWS</div>
