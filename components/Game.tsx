@@ -35,7 +35,7 @@ const CONTRACT_ABI = [
   }
 ] as const;
 
-// ADRESS
+// ADDRESS
 const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9"; 
 
 // --- Types ---
@@ -317,9 +317,8 @@ export default function Game() {
 
     const loop = () => {
       ctx.clearRect(0, 0, width, height);
-      // Use fixed percentage of window height for consistent layout
       const centerX = width / 2;
-      const centerY = height * 0.35; 
+      const centerY = height * 0.35;
       const startArrowY = height * 0.82;
 
       // Draw Target
@@ -425,13 +424,13 @@ export default function Game() {
   // --- Actions ---
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeft <= 0) return;
-    const h = window.innerHeight; // Ensure we rely on window height which matches canvas logic
+    const h = window.innerHeight; 
     flyingArrow.current = { y: h * 0.82 };
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
-    // CRITICAL FIX: Explicitly check for buttons or their parents to prevent unwanted shooting
+    // Check if clicked element is a button or modal content
     if (target.closest('button') || target.closest('.modal-card')) {
         return;
     }
@@ -580,20 +579,20 @@ export default function Game() {
   };
 
   return (
-    // Moved onPointerDown here to capture clicks everywhere, but canvas is now absolute background
     <div 
         ref={containerRef}
         className={`fixed inset-0 w-full h-[100dvh] max-h-[100dvh] max-w-[480px] mx-auto flex flex-col overflow-hidden transition-colors duration-300 shadow-2xl ${currentTheme === 'light' ? 'bg-white text-black' : 'bg-[#000010] text-white'}`}
+        // ADDED onPointerDown here to capture clicks for game, preventing default only if not hitting UI
         onPointerDown={handlePointerDown}
     >
       
-      {/* Canvas Layer - Absolute Background */}
+      {/* Canvas Layer - Absolute Background z-0 */}
       <canvas 
         ref={canvasRef} 
         className="absolute inset-0 block w-full h-full touch-none select-none z-0" 
       />
 
-      {/* UI Layer - Sits on top (z-10) */}
+      {/* UI Layer - Sits on top (z-10), allows clicks through empty space */}
       <div className="relative z-10 flex flex-col h-full pointer-events-none">
         
         {/* Top Bar */}
@@ -602,11 +601,11 @@ export default function Game() {
             BASE <span className="text-[#0000ff]">ARCHERY</span>
             </div>
             <div className="flex gap-2 items-center flex-shrink-0 min-w-0">
-                <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-500/10 transition-colors">
+                <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-500/10 transition-colors flex items-center justify-center">
                     {currentTheme === 'dark' ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="white" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-sun"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
                     ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-moon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
                     )}
                 </button>
                 {renderProfile()}
@@ -637,7 +636,7 @@ export default function Game() {
 
       </div>
 
-      {/* Modals Overlay - Z-50 to be on top of everything */}
+      {/* Modals Overlay */}
       <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col justify-end transition-opacity duration-300 z-50 ${isGameOver || isLevelComplete || showFaq || showLeaderboard ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <div className={`
             text-center transform transition-transform duration-300 border-t shadow-2xl flex flex-col w-full
