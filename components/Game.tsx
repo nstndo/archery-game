@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient, useReadContract } from 'wagmi';
 import { base } from 'viem/chains';
-import { sdk } from '@farcaster/miniapp-sdk';
+import sdk, { type FrameContext } from '@farcaster/frame-sdk';
 
 // --- ABI ---
 const CONTRACT_ABI = [
@@ -71,7 +71,7 @@ export default function Game() {
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
-  const publicClient = usePublicClient();
+  const publicClient = usePublicClient(); // Используем для прямого чтения
   
   // Mint Hooks
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
@@ -99,6 +99,10 @@ export default function Game() {
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
+  
+  // Farcaster/Base App Context State
+  const [frameContext, setFrameContext] = useState<FrameContext | null>(null);
+  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
 
   // Game Logic Refs
   const gameState = useRef<'playing' | 'gameover' | 'level_complete' | 'paused'>('playing');
@@ -548,16 +552,21 @@ export default function Game() {
     });
   };
 
-  const handleShare = async () => {
-  try {
-    await sdk.actions.composeCast({
-      text: `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score?`,
-      embeds: [window.location.href],
-    });
-  } catch (e) {
-    console.error('Share failed', e);
-  }
-};
+  const handleShare = () => {
+    const text = encodeURIComponent(`I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`);
+    const embed = encodeURIComponent('https://base-archery-game.vercel.app'); 
+    const shareUrl = `https://warpcast.com/~/compose?text=${text}&embeds[]=${embed}`;
+    
+    if (isSDKLoaded && sdk.actions && sdk.actions.openUrl) {
+        try {
+            sdk.actions.openUrl(shareUrl);
+            return;
+        } catch (e) {
+            console.warn("SDK openUrl failed", e);
+        }
+    }
+    window.open(shareUrl, '_blank');
+  };
 
   // Render Profile
   const renderProfile = () => {
