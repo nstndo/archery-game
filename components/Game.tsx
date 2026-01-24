@@ -353,7 +353,7 @@ export default function Game() {
 
             if (collision) {
               gameState.current = 'gameover';
-              setIsGameOver(true);
+              setTimeout(() => setIsGameOver(true), 50);
             } else {
               stuckArrows.current.push({ angle: hitAngle });
               flyingArrow.current = null;
@@ -363,7 +363,7 @@ export default function Game() {
 
               if (arrowsLeftRef.current <= 0) {
                 gameState.current = 'level_complete';
-                setIsLevelComplete(true);
+                setTimeout(() => setIsLevelComplete(true), 50);
               }
             }
           }
@@ -395,7 +395,7 @@ export default function Game() {
 
   const handlePointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('.modal-card') || target.closest('.top-bar') || target.closest('.game-stats')) {
+    if (isGameOver || isLevelComplete || target.closest('button') || target.closest('.modal-card') || target.closest('.top-bar') || target.closest('.game-stats')) {
       return;
     }
     e.preventDefault();
@@ -404,16 +404,20 @@ export default function Game() {
 
   const resetLevel = (lvl: number) => {
     if (resetContract) resetContract();
-    setLevel(lvl);
-    setArrowsLeft(10);
-    arrowsLeftRef.current = 10;
-    stuckArrows.current = [];
-    flyingArrow.current = null;
-    particles.current = [];
-    rotation.current = 0;
-    gameState.current = 'playing';
+    
     setIsGameOver(false);
     setIsLevelComplete(false);
+    
+    setTimeout(() => {
+      setLevel(lvl);
+      setArrowsLeft(10);
+      arrowsLeftRef.current = 10;
+      stuckArrows.current = [];
+      flyingArrow.current = null;
+      particles.current = [];
+      rotation.current = 0;
+      gameState.current = 'playing';
+    }, 100);
   };
 
   const toggleTheme = () => {
@@ -492,7 +496,6 @@ export default function Game() {
       }
     }
 
-    // Fallback to native share or clipboard
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
         await navigator.share({
@@ -515,45 +518,45 @@ export default function Game() {
   };
 
   const renderProfile = () => {
-  if (context?.user) {
-    return (
-      <div className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border max-w-[140px] ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200' : 'bg-white/10 border-white/20'}`}>
-        {context.user.pfpUrl && (
-          <img 
-            src={context.user.pfpUrl} 
-            alt="pfp" 
-            className="w-6 h-6 rounded-full"
-          />
-        )}
-        <span className={`text-sm font-medium truncate font-orbitron ${currentTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-          {context.user.username}
-        </span>
-      </div>
-    );
-  }
+    if (context?.user) {
+      return (
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border max-w-[140px] ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200' : 'bg-white/10 border-white/20'}`}>
+          {context.user.pfpUrl && (
+            <img 
+              src={context.user.pfpUrl} 
+              alt="pfp" 
+              className="w-6 h-6 rounded-full"
+            />
+          )}
+          <span className={`text-sm font-medium truncate font-orbitron ${currentTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+            {context.user.username}
+          </span>
+        </div>
+      );
+    }
 
-  if (isConnected && address) {
+    if (isConnected && address) {
+      return (
+        <button
+          onClick={() => disconnect()}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all active:scale-95 max-w-[140px] hover:opacity-70 font-orbitron ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-gray-900' : 'bg-white/10 border-white/20 text-white'}`}
+        >
+          <span className="text-sm font-medium">
+            {address.slice(0, 4)}...{address.slice(-4)}
+          </span>
+        </button>
+      );
+    }
+
     return (
       <button
-        onClick={() => disconnect()}
-        className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all active:scale-95 max-w-[140px] hover:opacity-70 font-orbitron ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-gray-900' : 'bg-white/10 border-white/20 text-white'}`}
+        onClick={handleConnect}
+        className="px-4 py-2 rounded-2xl bg-[#0000ff] text-white text-sm font-bold uppercase tracking-wider active:scale-95 transition-transform font-orbitron"
       >
-        <span className="text-sm font-medium">
-          {address.slice(0, 4)}...{address.slice(-4)}
-        </span>
+        CONNECT
       </button>
     );
-  }
-
-  return (
-    <button
-      onClick={handleConnect}
-      className="px-4 py-2 rounded-2xl bg-[#0000ff] text-white text-sm font-bold uppercase tracking-wider active:scale-95 transition-transform font-orbitron"
-    >
-      CONNECT
-    </button>
-  );
-};
+  };
 
   return (
     <div 
@@ -577,7 +580,7 @@ export default function Game() {
         {/* Top Bar */}
         <div className={`top-bar flex justify-between items-center px-4 py-4 pt-[calc(15px+env(safe-area-inset-top))] backdrop-blur-md border-b transition-colors duration-300 flex-shrink-0 pointer-events-auto ${currentTheme === 'light' ? 'bg-white/85 border-blue-600/10' : 'bg-[#000020]/85 border-white/10'}`}>
           <div className={`font-orbitron font-black text-lg flex items-center gap-2 uppercase tracking-wide flex-shrink-0 ${currentTheme === 'dark' ? 'text-white' : 'text-black'}`}>
-  BASE <span className="text-[#0000ff]">ARCHERY</span>
+            BASE <span className="text-[#0000ff]">ARCHERY</span>
           </div>
           <div className="flex gap-2 items-center flex-shrink-0 min-w-0">
             <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-500/10 transition-colors flex items-center justify-center">
@@ -677,7 +680,7 @@ export default function Game() {
                   {isConfirmed && (
                     <button
                       onClick={handleShare}
-                      className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000dd] text-white mb-3 shadow-lg shadow-blue-600/30 active:scale-98 transition-transform"
+                      className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-green-600 text-white mb-3 shadow-lg shadow-green-600/30 active:scale-98 transition-transform"
                     >
                       SHARE ACHIEVEMENT
                     </button>
