@@ -474,35 +474,43 @@ export default function Game() {
   };
 
   const handleShare = async () => {
-    const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`;
-    const embedUrl = 'https://base-archery-game.vercel.app';
+    const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score?`;
+    const url = 'https://base-archery-game.vercel.app';
 
     if (isFrameReady && context) {
       try {
         const { default: sdk } = await import('@farcaster/miniapp-sdk');
         if (sdk.actions?.composeCast) {
-          sdk.actions.composeCast({
+          await sdk.actions.composeCast({
             text,
-            embeds: [embedUrl]
+            embeds: [url]
           });
           return;
         }
       } catch (e) {
-        console.warn("SDK composeCast failed", e);
+        console.error("SDK composeCast failed", e);
       }
     }
 
+    // Fallback to native share or clipboard
     if (typeof navigator !== 'undefined' && navigator.share) {
-      navigator.share({
-        title: 'Base Archery',
-        text: text,
-        url: embedUrl
-      }).catch((err) => console.log('Share cancelled', err));
+      try {
+        await navigator.share({
+          title: 'Base Archery',
+          text: text,
+          url: url
+        });
+      } catch (err) {
+        console.log('Share cancelled', err);
+      }
     } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      const shareText = `${text}\n${embedUrl}`;
-      navigator.clipboard.writeText(shareText).then(() => {
+      const shareText = `${text}\n${url}`;
+      try {
+        await navigator.clipboard.writeText(shareText);
         alert('Link copied to clipboard!');
-      });
+      } catch (err) {
+        console.error('Copy failed', err);
+      }
     }
   };
 
@@ -574,7 +582,7 @@ export default function Game() {
           <div className="flex gap-2 items-center flex-shrink-0 min-w-0">
             <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-500/10 transition-colors flex items-center justify-center">
               {currentTheme === 'dark' ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="white" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-sun"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-sun"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
               ) : (
                 <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-moon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
               )}
@@ -589,9 +597,9 @@ export default function Game() {
             onClick={() => openModal('leaderboard')}
             className={`w-10 h-10 rounded-full flex justify-center items-center backdrop-blur-sm border active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-award"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
           </button>
-          <div className={`flex flex-col items-center justify-center px-6 py-2 rounded-2xl backdrop-blur-sm border ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200' : 'bg-black/50 border-white/10'}`}>
+          <div className={`flex flex-col items-center justify-center px-6 py-2 rounded-2xl backdrop-blur-sm border min-w-[140px] ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200' : 'bg-black/50 border-white/10'}`}>
             <div className={`text-sm font-bold font-orbitron ${currentTheme === 'dark' ? 'text-white' : 'text-[#0000ff]'}`}>
               LEVEL {level}
             </div>
