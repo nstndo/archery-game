@@ -1,6 +1,7 @@
 'use client';
 
 import { OnchainKitProvider } from '@coinbase/onchainkit';
+import { MiniKitProvider } from '@coinbase/onchainkit/minikit';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { base } from 'viem/chains';
 import { WagmiProvider, createConfig, http } from 'wagmi';
@@ -31,7 +32,9 @@ export function Providers({ children }: { children: ReactNode }) {
           apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
           chain={base}
         >
-          {children}
+          <MiniKitProvider>
+            {children}
+          </MiniKitProvider>
         </OnchainKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
