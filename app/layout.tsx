@@ -38,7 +38,7 @@ export const metadata: Metadata = {
         action: {
           type: "launch_frame",
           name: "Base Archery",
-          url: https://base-archery-game.vercel.app,
+          url: base-archery-game.vercel.app,
           splashImageUrl: `https://base-archery-game.vercel.app/logo.png`,
           splashBackgroundColor: "#000010"
         }
