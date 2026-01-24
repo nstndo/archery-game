@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
 import { base } from 'viem/chains';
-import sdk, { type FrameContext } from '@farcaster/frame-sdk';
+import { useMiniKit, useComposeCast } from '@coinbase/onchainkit/minikit';
 
 const CONTRACT_ABI = [
   {
@@ -64,6 +64,9 @@ export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const { isFrameReady, setFrameReady, context } = useMiniKit();
+  const { composeCast } = useComposeCast();
+
   const { address, isConnected } = useAccount();
   const { connectors, connect } = useConnect();
   const { disconnect } = useDisconnect();
@@ -83,9 +86,6 @@ export default function Game() {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
-
-  const [frameContext, setFrameContext] = useState<FrameContext | null>(null);
-  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
 
   const gameState = useRef<'playing' | 'gameover' | 'level_complete' | 'paused'>('playing');
   const stuckArrows = useRef<Arrow[]>([]);
@@ -107,18 +107,10 @@ export default function Game() {
   });
 
   useEffect(() => {
-    const initSDK = async () => {
-      try {
-        const context = await sdk.context;
-        setFrameContext(context);
-        await sdk.actions.ready();
-        setIsSDKLoaded(true);
-      } catch (err) {
-        console.log('Not in frame context');
-      }
-    };
-    initSDK();
-  }, []);
+    if (!isFrameReady) {
+      setFrameReady();
+    }
+  }, [setFrameReady, isFrameReady]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -155,8 +147,8 @@ export default function Game() {
         
         let displayName: string | undefined;
         
-        if (isCurrentUser && frameContext?.user) {
-          displayName = frameContext.user.displayName || frameContext.user.username || undefined;
+        if (isCurrentUser && context?.user) {
+          displayName = context.user.displayName || context.user.username || undefined;
         }
         
         return {
@@ -165,7 +157,7 @@ export default function Game() {
           tokenId: item.tokenId.toString(),
           isCurrentUser,
           displayName,
-          fid: isCurrentUser && frameContext?.user ? frameContext.user.fid : undefined
+          fid: isCurrentUser && context?.user ? context.user.fid : undefined
         };
       });
 
@@ -408,7 +400,7 @@ export default function Game() {
       if (containerRef.current) resizeObserver.unobserve(containerRef.current);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [level, currentTheme, frameContext, address]);
+  }, [level, currentTheme, context, address]);
 
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeftRef.current <= 0) return;
@@ -498,46 +490,48 @@ export default function Game() {
   };
 
   const handleShare = () => {
-  const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`;
-  const embedUrl = 'https://base-archery-game.vercel.app';
+    const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`;
+    const embedUrl = 'https://base-archery-game.vercel.app';
 
-  if (isSDKLoaded && frameContext) {
-    try {
-      const shareIntent = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(embedUrl)}`;
-      sdk.actions.openUrl(shareIntent);
-      return;
-    } catch (e) {
-      console.warn("SDK openUrl failed", e);
+    if (isFrameReady && context) {
+      try {
+        composeCast({
+          text,
+          embeds: [embedUrl]
+        });
+        return;
+      } catch (e) {
+        console.warn("MiniKit composeCast failed", e);
+      }
     }
-  }
 
-  if (typeof navigator !== 'undefined' && navigator.share) {
-    navigator.share({
-      title: 'Base Archery',
-      text: text,
-      url: embedUrl
-    }).catch((err) => console.log('Share cancelled', err));
-  } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-    const shareText = `${text}\n${embedUrl}`;
-    navigator.clipboard.writeText(shareText).then(() => {
-      alert('Link copied to clipboard!');
-    });
-  }
-};
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator.share({
+        title: 'Base Archery',
+        text: text,
+        url: embedUrl
+      }).catch((err) => console.log('Share cancelled', err));
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      const shareText = `${text}\n${embedUrl}`;
+      navigator.clipboard.writeText(shareText).then(() => {
+        alert('Link copied to clipboard!');
+      });
+    }
+  };
 
   const renderProfile = () => {
-    if (frameContext?.user) {
+    if (context?.user) {
       return (
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl border border-current max-w-[140px]">
-          {frameContext.user.pfpUrl && (
+          {context.user.pfpUrl && (
             <img 
-              src={frameContext.user.pfpUrl} 
+              src={context.user.pfpUrl} 
               alt="pfp" 
               className="w-6 h-6 rounded-full"
             />
           )}
           <span className="text-sm font-medium truncate">
-            {frameContext.user.displayName || frameContext.user.username}
+            {context.user.displayName || context.user.username}
           </span>
         </div>
       );
@@ -569,7 +563,7 @@ export default function Game() {
   return (
     <div 
       ref={containerRef}
-      className="relative w-full h-screen overflow-hidden"
+      className="relative w-full h-screen overflow-hidden max-w-[600px] mx-auto"
       onPointerDown={handlePointerDown}
       style={{ 
         touchAction: 'none',
@@ -586,14 +580,20 @@ export default function Game() {
 
       <div className="absolute inset-0 pointer-events-none flex flex-col" style={{ zIndex: 10 }}>
         <div className="top-bar pointer-events-auto flex items-center justify-between px-4 py-3">
-          <h1 className={`text-lg font-black tracking-wider ${currentTheme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
+          <h1 className={`text-lg font-black font-orbitron tracking-wider ${currentTheme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
             BASE ARCHERY
           </h1>
           <button
             onClick={toggleTheme}
             className={`w-10 h-10 rounded-full flex items-center justify-center ${currentTheme === 'dark' ? 'bg-white/10 text-white' : 'bg-blue-100 text-blue-600'}`}
           >
-            {currentTheme === 'dark' ? '☀️' : '🌙'}
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              {currentTheme === 'dark' ? (
+                <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+              ) : (
+                <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+              )}
+            </svg>
           </button>
           {renderProfile()}
         </div>
@@ -603,13 +603,15 @@ export default function Game() {
             onClick={() => openModal('leaderboard')}
             className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
           >
-            🏆
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+            </svg>
           </button>
           <div className="flex flex-col items-center">
-            <div className={`text-sm font-bold ${currentTheme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
+            <div className={`text-sm font-bold font-orbitron ${currentTheme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
               LEVEL {level}
             </div>
-            <div className={`text-xs ${currentTheme === 'dark' ? 'text-white/70' : 'text-blue-700/70'}`}>
+            <div className={`text-xs font-roboto ${currentTheme === 'dark' ? 'text-white/70' : 'text-blue-700/70'}`}>
               {arrowsLeft} ARROWS
             </div>
           </div>
@@ -617,14 +619,16 @@ export default function Game() {
             onClick={() => openModal('faq')}
             className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
           >
-            ❓
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+            </svg>
           </button>
         </div>
 
         <div className="flex-1 pointer-events-auto flex items-center justify-center p-4">
           {showLeaderboard && (
             <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
-              <h2 className="text-2xl font-black text-center mb-4">LEADERBOARD</h2>
+              <h2 className="text-2xl font-black font-orbitron text-center mb-4">LEADERBOARD</h2>
               {isLoadingLeaderboard ? (
                 <div className="text-center py-8">LOADING...</div>
               ) : leaderboardData.length > 0 ? (
@@ -635,15 +639,15 @@ export default function Game() {
                       className={`flex items-center justify-between p-3 rounded-xl ${item.isCurrentUser ? 'bg-blue-500/20 border-2 border-blue-500' : currentTheme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="font-bold text-lg">#{i + 1}</span>
+                        <span className="font-bold font-orbitron text-lg">#{i + 1}</span>
                         <div className="flex flex-col">
-                          <span className="font-medium">
+                          <span className="font-medium font-roboto">
                             {item.displayName || `${item.address.slice(0, 6)}...${item.address.slice(-4)}`}
                           </span>
                           <span className="text-xs opacity-70">Token ID: {item.tokenId}</span>
                         </div>
                       </div>
-                      <div className="font-black text-xl">LVL {item.level}</div>
+                      <div className="font-black font-orbitron text-xl">LVL {item.level}</div>
                     </div>
                   ))}
                 </div>
@@ -653,13 +657,13 @@ export default function Game() {
               <div className="flex gap-2 mt-4">
                 <button
                   onClick={fetchLeaderboard}
-                  className={`flex-1 p-3 rounded-xl font-bold ${currentTheme === 'dark' ? 'bg-white/10' : 'bg-gray-200'}`}
+                  className={`flex-1 p-3 rounded-xl font-bold font-orbitron ${currentTheme === 'dark' ? 'bg-white/10' : 'bg-gray-200'}`}
                 >
                   Refresh
                 </button>
                 <button
                   onClick={closeModal}
-                  className="flex-1 p-3 rounded-xl font-bold bg-blue-600 text-white"
+                  className="flex-1 p-3 rounded-xl font-bold font-orbitron bg-blue-600 text-white"
                 >
                   Close
                 </button>
@@ -671,16 +675,16 @@ export default function Game() {
             <>
               {isGameOver && (
                 <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
-                  <h2 className="text-3xl font-black text-center mb-2">GAME OVER</h2>
-                  <p className="text-center mb-4 opacity-70">You hit another arrow!</p>
+                  <h2 className="text-3xl font-black font-orbitron text-center mb-2">GAME OVER</h2>
+                  <p className="text-center mb-4 opacity-70 font-roboto">You hit another arrow!</p>
                   <div className="text-center mb-6">
-                    <div className="text-sm opacity-70 mb-1">Level Reached</div>
-                    <div className="text-6xl font-black text-blue-600">{level}</div>
+                    <div className="text-sm opacity-70 mb-1 font-roboto">Level Reached</div>
+                    <div className="text-6xl font-black font-orbitron text-blue-600">{level}</div>
                   </div>
                   {isConfirmed && (
                     <button
                       onClick={handleShare}
-                      className="w-full p-4 rounded-2xl font-bold text-base uppercase tracking-widest bg-green-600 text-white mb-3"
+                      className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-green-600 text-white mb-3"
                     >
                       SHARE ACHIEVEMENT
                     </button>
@@ -688,13 +692,13 @@ export default function Game() {
                   <button
                     onClick={handleMint}
                     disabled={isPending || isConfirming}
-                    className="w-full p-4 rounded-2xl font-bold text-base uppercase tracking-widest bg-blue-600 text-white mb-3 disabled:opacity-50"
+                    className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-blue-600 text-white mb-3 disabled:opacity-50"
                   >
                     {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted Successfully' : 'Mint Record NFT'}
                   </button>
                   <button
                     onClick={() => resetLevel(1)}
-                    className={`w-full p-4 rounded-2xl font-bold text-base uppercase tracking-widest border ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}
+                    className={`w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest border ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}
                   >
                     Try Again
                   </button>
@@ -703,11 +707,11 @@ export default function Game() {
 
               {isLevelComplete && (
                 <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
-                  <h2 className="text-3xl font-black text-center mb-2">LEVEL COMPLETE!</h2>
-                  <p className="text-center mb-6 opacity-70">Great shot! Ready for the next challenge?</p>
+                  <h2 className="text-3xl font-black font-orbitron text-center mb-2">LEVEL COMPLETE!</h2>
+                  <p className="text-center mb-6 opacity-70 font-roboto">Great shot! Ready for the next challenge?</p>
                   <button
                     onClick={() => resetLevel(level + 1)}
-                    className="w-full p-4 rounded-2xl font-bold text-base uppercase tracking-widest bg-blue-600 text-white"
+                    className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-blue-600 text-white"
                   >
                     Next Level
                   </button>
@@ -716,8 +720,8 @@ export default function Game() {
 
               {showFaq && (
                 <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
-                  <h2 className="text-2xl font-black text-center mb-4">GAME RULES</h2>
-                  <div className="space-y-4 mb-6">
+                  <h2 className="text-2xl font-black font-orbitron text-center mb-4">GAME RULES</h2>
+                  <div className="space-y-4 mb-6 font-roboto">
                     <div>
                       <h3 className="font-bold mb-1">HOW TO PLAY?</h3>
                       <p className="text-sm opacity-70">Tap anywhere to shoot. Fill the target without hitting other arrows.</p>
@@ -729,7 +733,7 @@ export default function Game() {
                   </div>
                   <button
                     onClick={closeModal}
-                    className="w-full p-4 rounded-xl font-bold bg-blue-600 text-white"
+                    className="w-full p-4 rounded-xl font-bold font-orbitron bg-blue-600 text-white"
                   >
                     Close
                   </button>
