@@ -689,22 +689,24 @@ export default function Game() {
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                     {leaderboardData.map((item, i) => (
                         <div
-                            key={i}
-                            className={`flex items-center justify-between p-3 rounded-xl ${item.isCurrentUser ? 'bg-blue-500/20 border-2 border-blue-500' : currentTheme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}
+                        key={i}
+                        className={`flex items-center justify-between p-3 rounded-xl ${item.isCurrentUser ? 'bg-blue-500/20 border-2 border-blue-500' : currentTheme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}
                         >
-                        <div className="flex items-center gap-3">
-                        <span className="font-bold font-orbitron text-lg">#{i + 1}</span>
-                        <div className="flex flex-col">
-                            <span className="font-medium font-orbitron">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <span className="font-bold font-orbitron text-lg w-12 flex-shrink-0">#{i + 1}</span>
+                        <div className="flex flex-col min-w-0 flex-1">
+                            <span className="font-medium font-orbitron truncate">
                                 {item.isCurrentUser && context?.user?.username
                                 ? context.user.username
                                 : item.displayName || item.username || `${item.address.slice(0, 6)}...${item.address.slice(-4)}`
                                 }
                             </span>
-                        <span className="text-xs opacity-70 font-orbitron">Token ID: {item.tokenId}</span>
+                            <span className="text-xs opacity-70 font-orbitron">Token ID: {item.tokenId}</span>
                         </div>
                         </div>
-                        <div className="font-black font-orbitron text-xl">LVL {item.level}</div>
+                        <div className="font-black font-orbitron text-base flex-shrink-0 ml-2">
+                        <span className="text-sm opacity-70">LVL</span> {item.level}
+                        </div>
                         </div>
                     ))}
                 </div>
