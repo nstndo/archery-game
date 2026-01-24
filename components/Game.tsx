@@ -576,8 +576,8 @@ export default function Game() {
       <div className="absolute inset-0 pointer-events-none flex flex-col" style={{ zIndex: 10 }}>
         {/* Top Bar */}
         <div className={`top-bar flex justify-between items-center px-4 py-4 pt-[calc(15px+env(safe-area-inset-top))] backdrop-blur-md border-b transition-colors duration-300 flex-shrink-0 pointer-events-auto ${currentTheme === 'light' ? 'bg-white/85 border-blue-600/10' : 'bg-[#000020]/85 border-white/10'}`}>
-          <div className="font-orbitron font-black text-lg flex items-center gap-2 uppercase tracking-wide flex-shrink-0">
-            BASE <span className="text-[#0000ff]">ARCHERY</span>
+          <div className={`font-orbitron font-black text-lg flex items-center gap-2 uppercase tracking-wide flex-shrink-0 ${currentTheme === 'dark' ? 'text-white' : 'text-black'}`}>
+  BASE <span className="text-[#0000ff]">ARCHERY</span>
           </div>
           <div className="flex gap-2 items-center flex-shrink-0 min-w-0">
             <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-500/10 transition-colors flex items-center justify-center">
