@@ -3,9 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
 import { base } from 'viem/chains';
-import { useMiniKit, useComposeCast } from '@coinbase/onchainkit/minikit';
+import sdk, { type FrameContext } from '@farcaster/frame-sdk';
 
-// --- ABI ---
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -36,7 +35,6 @@ const CONTRACT_ABI = [
 
 const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9";
 
-// --- Types ---
 interface Arrow {
   angle: number;
 }
@@ -58,19 +56,14 @@ interface LeaderboardEntry {
   level: number;
   tokenId: string;
   isCurrentUser: boolean;
-  displayName?: string; // ✅ НОВОЕ: для отображения никнеймов
-  fid?: number; // ✅ НОВОЕ: FID пользователя
+  displayName?: string;
+  fid?: number;
 }
 
 export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // ✅ НОВОЕ: MiniKit hooks вместо frame-sdk
-  const { isFrameReady, setFrameReady, context } = useMiniKit();
-  const composeCast = useComposeCast();
-
-  // Web3 Hooks
   const { address, isConnected } = useAccount();
   const { connectors, connect } = useConnect();
   const { disconnect } = useDisconnect();
@@ -78,11 +71,9 @@ export default function Game() {
   const { switchChain } = useSwitchChain();
   const publicClient = usePublicClient();
 
-  // Mint Hooks
   const { data: hash, isPending, writeContract, reset: resetContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
 
-  // UI State
   const [level, setLevel] = useState(1);
   const [arrowsLeft, setArrowsLeft] = useState(10);
   const [isGameOver, setIsGameOver] = useState(false);
@@ -93,7 +84,9 @@ export default function Game() {
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
 
-  // Game Logic Refs
+  const [frameContext, setFrameContext] = useState<FrameContext | null>(null);
+  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
+
   const gameState = useRef<'playing' | 'gameover' | 'level_complete' | 'paused'>('playing');
   const stuckArrows = useRef<Arrow[]>([]);
   const flyingArrow = useRef<{ y: number } | null>(null);
@@ -113,14 +106,20 @@ export default function Game() {
     shardAse_Blue: null as HTMLImageElement | null,
   });
 
-  // ✅ НОВОЕ: Инициализация MiniKit вместо frame-sdk
   useEffect(() => {
-    if (!isFrameReady) {
-      setFrameReady();
-    }
-  }, [setFrameReady, isFrameReady]);
+    const initSDK = async () => {
+      try {
+        const context = await sdk.context;
+        setFrameContext(context);
+        await sdk.actions.ready();
+        setIsSDKLoaded(true);
+      } catch (err) {
+        console.log('Not in frame context');
+      }
+    };
+    initSDK();
+  }, []);
 
-  // Assets Init
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -138,7 +137,6 @@ export default function Game() {
     assets.current.shardAse_Blue = loadImg('https://base-archery-game.vercel.app/ase-blue.webp');
   }, []);
 
-  // ✅ НОВОЕ: Функция получения лидерборда с обработкой никнеймов
   const fetchLeaderboard = async () => {
     if (!publicClient) return;
 
@@ -155,12 +153,10 @@ export default function Game() {
       const formatted: LeaderboardEntry[] = data.map((item) => {
         const isCurrentUser = address ? item.wallet.toLowerCase() === address.toLowerCase() : false;
         
-        // ✅ ИСПРАВЛЕНИЕ #3: Определяем displayName для всех пользователей
         let displayName: string | undefined;
         
-        // Если это текущий пользователь в Base App
-        if (isCurrentUser && context?.user) {
-          displayName = context.user.displayName || context.user.username || undefined;
+        if (isCurrentUser && frameContext?.user) {
+          displayName = frameContext.user.displayName || frameContext.user.username || undefined;
         }
         
         return {
@@ -169,7 +165,7 @@ export default function Game() {
           tokenId: item.tokenId.toString(),
           isCurrentUser,
           displayName,
-          fid: isCurrentUser && context?.user ? context.user.fid : undefined
+          fid: isCurrentUser && frameContext?.user ? frameContext.user.fid : undefined
         };
       });
 
@@ -182,7 +178,6 @@ export default function Game() {
     }
   };
 
-  // Main Game Loop & Resize Observer (сокращено для читаемости - логика не изменена)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -324,7 +319,6 @@ export default function Game() {
       const centerY = height * 0.45;
       const startArrowY = height * 0.85;
 
-      // Draw Target
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(rotation.current);
@@ -346,7 +340,6 @@ export default function Game() {
       }
       ctx.restore();
 
-      // Draw Stuck Arrows
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(rotation.current);
@@ -355,7 +348,6 @@ export default function Game() {
 
       updateAndDrawParticles();
 
-      // Physics
       if (gameState.current === 'playing') {
         rotationChangeTimer.current--;
         if (rotationChangeTimer.current <= 0) {
@@ -401,7 +393,6 @@ export default function Game() {
         }
       }
 
-      // Draw Active Arrow
       if (flyingArrow.current) {
         drawArrow(centerX, flyingArrow.current.y);
       } else if (arrowsLeftRef.current > 0 && gameState.current === 'playing') {
@@ -417,9 +408,8 @@ export default function Game() {
       if (containerRef.current) resizeObserver.unobserve(containerRef.current);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [level, currentTheme]);
+  }, [level, currentTheme, frameContext, address]);
 
-  // --- Actions ---
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeftRef.current <= 0) return;
     const h = screenDims.current.height;
@@ -507,26 +497,22 @@ export default function Game() {
     });
   };
 
-  // ✅ ИСПРАВЛЕНИЕ #2: Новая функция шеринга с useComposeCast
   const handleShare = () => {
     const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`;
     const embedUrl = 'https://base-archery-game.vercel.app';
 
-    // Проверяем, работаем ли в Base App
-    if (isFrameReady && context) {
-      // ✅ Используем нативный composer через MiniKit
+    if (isSDKLoaded && frameContext && sdk.actions.composeCast) {
       try {
-        composeCast({
+        sdk.actions.composeCast({
           text,
           embeds: [embedUrl]
         });
         return;
       } catch (e) {
-        console.warn("MiniKit composeCast failed, falling back", e);
+        console.warn("SDK composeCast failed", e);
       }
     }
 
-    // ✅ Fallback для веб-версии: Web Share API
     if (navigator.share) {
       navigator.share({
         title: 'Base Archery',
@@ -534,7 +520,6 @@ export default function Game() {
         url: embedUrl
       }).catch((err) => console.log('Share cancelled', err));
     } else {
-      // Дополнительный fallback: копирование в буфер
       const shareText = `${text}\n${embedUrl}`;
       navigator.clipboard.writeText(shareText).then(() => {
         alert('Link copied to clipboard!');
@@ -542,21 +527,19 @@ export default function Game() {
     }
   };
 
-  // Render Profile
   const renderProfile = () => {
-    // ✅ НОВОЕ: Используем context.user вместо frameContext
-    if (context?.user) {
+    if (frameContext?.user) {
       return (
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl border border-current max-w-[140px]">
-          {context.user.pfpUrl && (
+          {frameContext.user.pfpUrl && (
             <img 
-              src={context.user.pfpUrl} 
+              src={frameContext.user.pfpUrl} 
               alt="pfp" 
               className="w-6 h-6 rounded-full"
             />
           )}
           <span className="text-sm font-medium truncate">
-            {context.user.displayName || context.user.username}
+            {frameContext.user.displayName || frameContext.user.username}
           </span>
         </div>
       );
@@ -597,16 +580,13 @@ export default function Game() {
           : 'linear-gradient(180deg, #ffffff 0%, #e8f4ff 100%)'
       }}
     >
-      {/* Canvas Layer */}
       <canvas 
         ref={canvasRef}
         className="absolute inset-0 w-full h-full"
         style={{ touchAction: 'none' }}
       />
 
-      {/* UI Layer */}
       <div className="absolute inset-0 pointer-events-none flex flex-col" style={{ zIndex: 10 }}>
-        {/* Top Bar */}
         <div className="top-bar pointer-events-auto flex items-center justify-between px-4 py-3">
           <h1 className={`text-lg font-black tracking-wider ${currentTheme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
             BASE ARCHERY
@@ -620,7 +600,6 @@ export default function Game() {
           {renderProfile()}
         </div>
 
-        {/* Stats Overlay */}
         <div className="game-stats pointer-events-auto flex items-center justify-between px-4 mt-2">
           <button
             onClick={() => openModal('leaderboard')}
@@ -644,7 +623,6 @@ export default function Game() {
           </button>
         </div>
 
-        {/* Modals Overlay */}
         <div className="flex-1 pointer-events-auto flex items-center justify-center p-4">
           {showLeaderboard && (
             <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
@@ -661,7 +639,6 @@ export default function Game() {
                       <div className="flex items-center gap-3">
                         <span className="font-bold text-lg">#{i + 1}</span>
                         <div className="flex flex-col">
-                          {/* ✅ ИСПРАВЛЕНИЕ #3: Отображаем никнейм или адрес */}
                           <span className="font-medium">
                             {item.displayName || `${item.address.slice(0, 6)}...${item.address.slice(-4)}`}
                           </span>

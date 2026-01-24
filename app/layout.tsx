@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Orbitron, Roboto } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
-import { SafeArea } from "@coinbase/onchainkit/minikit";
 import '@coinbase/onchainkit/styles.css';
 
 const orbitron = Orbitron({
@@ -33,7 +32,7 @@ export const metadata: Metadata = {
     images: [`${APP_URL}/opengraph-image.png`],
   },
   other: {
-    "base:app_id": "696eb06ac0ab25addaaaf6af", // ✅ Сохранен ваш app_id
+    "base:app_id": "696eb06ac0ab25addaaaf6af",
     "fc:frame": JSON.stringify({
       version: "next",
       imageUrl: `${APP_URL}/opengraph-image.png`,
@@ -60,9 +59,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${orbitron.variable} ${roboto.variable}`}>
         <Providers>
-          <SafeArea>
-            {children}
-          </SafeArea>
+          {children}
         </Providers>
       </body>
     </html>
