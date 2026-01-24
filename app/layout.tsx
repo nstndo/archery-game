@@ -42,7 +42,7 @@ export const metadata: Metadata = {
           type: "launch_frame",
           name: "Base Archery",
           url: APP_URL,
-          splashImageUrl: `${APP_URL}/base-logo.png`,
+          splashImageUrl: `${APP_URL}/splash.png`,
           splashBackgroundColor: "#000010"
         }
       }
