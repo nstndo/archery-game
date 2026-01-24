@@ -56,8 +56,6 @@ interface LeaderboardEntry {
   level: number;
   tokenId: string;
   isCurrentUser: boolean;
-  displayName?: string;
-  fid?: number;
 }
 
 export default function Game() {
@@ -141,24 +139,12 @@ export default function Game() {
         functionName: 'getLeaderboard',
       }) as any[];
 
-      const formatted: LeaderboardEntry[] = data.map((item) => {
-        const isCurrentUser = address ? item.wallet.toLowerCase() === address.toLowerCase() : false;
-        
-        let displayName: string | undefined;
-        
-        if (isCurrentUser && context?.user) {
-          displayName = context.user.displayName || context.user.username || undefined;
-        }
-        
-        return {
-          address: item.wallet,
-          level: Number(item.maxLevel),
-          tokenId: item.tokenId.toString(),
-          isCurrentUser,
-          displayName,
-          fid: isCurrentUser && context?.user ? context.user.fid : undefined
-        };
-      });
+      const formatted: LeaderboardEntry[] = data.map((item) => ({
+        address: item.wallet,
+        level: Number(item.maxLevel),
+        tokenId: item.tokenId.toString(),
+        isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
+      }));
 
       formatted.sort((a, b) => b.level - a.level);
       setLeaderboardData(formatted);
@@ -441,9 +427,8 @@ export default function Game() {
     if (isConnected) {
       disconnect();
     } else {
-      const injected = connectors.find((c) => c.type === 'injected');
       const coinbase = connectors.find((c) => c.id === 'coinbaseWalletSDK');
-      const connector = injected || coinbase || connectors[0];
+      const connector = coinbase || connectors[0];
       if (connector) connect({ connector });
     }
   };
@@ -489,37 +474,37 @@ export default function Game() {
   };
 
   const handleShare = async () => {
-  const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`;
-  const embedUrl = 'https://base-archery-game.vercel.app';
+    const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`;
+    const embedUrl = 'https://base-archery-game.vercel.app';
 
-  if (isFrameReady && context) {
-    try {
-      const { default: sdk } = await import('@farcaster/miniapp-sdk');
-      if (sdk.actions?.composeCast) {
-        sdk.actions.composeCast({
-          text,
-          embeds: [embedUrl]
-        });
-        return;
+    if (isFrameReady && context) {
+      try {
+        const { default: sdk } = await import('@farcaster/miniapp-sdk');
+        if (sdk.actions?.composeCast) {
+          sdk.actions.composeCast({
+            text,
+            embeds: [embedUrl]
+          });
+          return;
+        }
+      } catch (e) {
+        console.warn("SDK composeCast failed", e);
       }
-    } catch (e) {
-      console.warn("SDK composeCast failed", e);
     }
-  }
 
-  if (typeof navigator !== 'undefined' && navigator.share) {
-    navigator.share({
-      title: 'Base Archery',
-      text: text,
-      url: embedUrl
-    }).catch((err) => console.log('Share cancelled', err));
-  } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-    const shareText = `${text}\n${embedUrl}`;
-    navigator.clipboard.writeText(shareText).then(() => {
-      alert('Link copied to clipboard!');
-    });
-  }
-};
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator.share({
+        title: 'Base Archery',
+        text: text,
+        url: embedUrl
+      }).catch((err) => console.log('Share cancelled', err));
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      const shareText = `${text}\n${embedUrl}`;
+      navigator.clipboard.writeText(shareText).then(() => {
+        alert('Link copied to clipboard!');
+      });
+    }
+  };
 
   const renderProfile = () => {
     if (context?.user) {
@@ -533,7 +518,7 @@ export default function Game() {
             />
           )}
           <span className="text-sm font-medium truncate">
-            {context.user.displayName || context.user.username}
+            {context.user.username}
           </span>
         </div>
       );
@@ -555,7 +540,7 @@ export default function Game() {
     return (
       <button
         onClick={handleConnect}
-        className="px-4 py-2 rounded-2xl bg-blue-600 text-white text-sm font-bold uppercase tracking-wider active:scale-95 transition-transform"
+        className="px-4 py-2 rounded-2xl bg-[#0000ff] text-white text-sm font-bold uppercase tracking-wider active:scale-95 transition-transform"
       >
         CONNECT
       </button>
@@ -582,7 +567,7 @@ export default function Game() {
 
       <div className="absolute inset-0 pointer-events-none flex flex-col" style={{ zIndex: 10 }}>
         <div className="top-bar pointer-events-auto flex items-center justify-between px-4 py-3">
-          <h1 className={`text-lg font-black font-orbitron tracking-wider ${currentTheme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
+          <h1 className={`text-lg font-black font-orbitron tracking-wider ${currentTheme === 'dark' ? 'text-white' : 'text-[#0000ff]'}`}>
             BASE ARCHERY
           </h1>
           <button
@@ -610,7 +595,7 @@ export default function Game() {
             </svg>
           </button>
           <div className="flex flex-col items-center">
-            <div className={`text-sm font-bold font-orbitron ${currentTheme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
+            <div className={`text-sm font-bold font-orbitron ${currentTheme === 'dark' ? 'text-white' : 'text-[#0000ff]'}`}>
               LEVEL {level}
             </div>
             <div className={`text-xs font-roboto ${currentTheme === 'dark' ? 'text-white/70' : 'text-blue-700/70'}`}>
@@ -632,7 +617,7 @@ export default function Game() {
             <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
               <h2 className="text-2xl font-black font-orbitron text-center mb-4">LEADERBOARD</h2>
               {isLoadingLeaderboard ? (
-                <div className="text-center py-8">LOADING...</div>
+                <div className="text-center py-8 font-roboto">LOADING...</div>
               ) : leaderboardData.length > 0 ? (
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {leaderboardData.map((item, i) => (
@@ -644,9 +629,12 @@ export default function Game() {
                         <span className="font-bold font-orbitron text-lg">#{i + 1}</span>
                         <div className="flex flex-col">
                           <span className="font-medium font-roboto">
-                            {item.displayName || `${item.address.slice(0, 6)}...${item.address.slice(-4)}`}
+                            {item.isCurrentUser && context?.user?.username
+                              ? context.user.username
+                              : `${item.address.slice(0, 6)}...${item.address.slice(-4)}`
+                            }
                           </span>
-                          <span className="text-xs opacity-70">Token ID: {item.tokenId}</span>
+                          <span className="text-xs opacity-70 font-roboto">Token ID: {item.tokenId}</span>
                         </div>
                       </div>
                       <div className="font-black font-orbitron text-xl">LVL {item.level}</div>
@@ -654,7 +642,7 @@ export default function Game() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 opacity-50">No champions yet.</div>
+                <div className="text-center py-8 opacity-50 font-roboto">No champions yet.</div>
               )}
               <div className="flex gap-2 mt-4">
                 <button
@@ -665,7 +653,7 @@ export default function Game() {
                 </button>
                 <button
                   onClick={closeModal}
-                  className="flex-1 p-3 rounded-xl font-bold font-orbitron bg-blue-600 text-white"
+                  className="flex-1 p-3 rounded-xl font-bold font-orbitron bg-[#0000ff] text-white"
                 >
                   Close
                 </button>
@@ -681,12 +669,12 @@ export default function Game() {
                   <p className="text-center mb-4 opacity-70 font-roboto">You hit another arrow!</p>
                   <div className="text-center mb-6">
                     <div className="text-sm opacity-70 mb-1 font-roboto">Level Reached</div>
-                    <div className="text-6xl font-black font-orbitron text-blue-600">{level}</div>
+                    <div className="text-6xl font-black font-orbitron text-[#0000ff]">{level}</div>
                   </div>
                   {isConfirmed && (
                     <button
                       onClick={handleShare}
-                      className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-green-600 text-white mb-3"
+                      className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-green-600 text-white mb-3 shadow-lg shadow-green-600/30 active:scale-98 transition-transform"
                     >
                       SHARE ACHIEVEMENT
                     </button>
@@ -694,13 +682,13 @@ export default function Game() {
                   <button
                     onClick={handleMint}
                     disabled={isPending || isConfirming}
-                    className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-blue-600 text-white mb-3 disabled:opacity-50"
+                    className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000ff] text-white mb-3 shadow-lg shadow-blue-600/30 active:scale-98 transition-transform disabled:opacity-50"
                   >
                     {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted Successfully' : 'Mint Record NFT'}
                   </button>
                   <button
                     onClick={() => resetLevel(1)}
-                    className={`w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest border ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}
+                    className={`w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}
                   >
                     Try Again
                   </button>
@@ -713,7 +701,7 @@ export default function Game() {
                   <p className="text-center mb-6 opacity-70 font-roboto">Great shot! Ready for the next challenge?</p>
                   <button
                     onClick={() => resetLevel(level + 1)}
-                    className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-blue-600 text-white"
+                    className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 active:scale-98 transition-transform"
                   >
                     Next Level
                   </button>
@@ -735,7 +723,7 @@ export default function Game() {
                   </div>
                   <button
                     onClick={closeModal}
-                    className="w-full p-4 rounded-xl font-bold font-orbitron bg-blue-600 text-white"
+                    className="w-full p-4 rounded-xl font-bold font-orbitron bg-[#0000ff] text-white"
                   >
                     Close
                   </button>
