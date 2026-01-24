@@ -515,45 +515,45 @@ export default function Game() {
   };
 
   const renderProfile = () => {
-    if (context?.user) {
-      return (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl border border-current max-w-[140px]">
-          {context.user.pfpUrl && (
-            <img 
-              src={context.user.pfpUrl} 
-              alt="pfp" 
-              className="w-6 h-6 rounded-full"
-            />
-          )}
-          <span className="text-sm font-medium truncate font-orbitron">
-            {context.user.username}
-          </span>
-        </div>
-      );
-    }
+  if (context?.user) {
+    return (
+      <div className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border max-w-[140px] ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200' : 'bg-white/10 border-white/20'}`}>
+        {context.user.pfpUrl && (
+          <img 
+            src={context.user.pfpUrl} 
+            alt="pfp" 
+            className="w-6 h-6 rounded-full"
+          />
+        )}
+        <span className={`text-sm font-medium truncate font-orbitron ${currentTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+          {context.user.username}
+        </span>
+      </div>
+    );
+  }
 
-    if (isConnected && address) {
-      return (
-        <button
-          onClick={() => disconnect()}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border border-current transition-all active:scale-95 max-w-[140px] hover:opacity-70 font-orbitron ${currentTheme === 'light' ? 'border-gray-300' : 'border-white/20'}`}
-        >
-          <span className="text-sm font-medium">
-            {address.slice(0, 4)}...{address.slice(-4)}
-          </span>
-        </button>
-      );
-    }
-
+  if (isConnected && address) {
     return (
       <button
-        onClick={handleConnect}
-        className="px-4 py-2 rounded-2xl bg-[#0000ff] text-white text-sm font-bold uppercase tracking-wider active:scale-95 transition-transform font-orbitron"
+        onClick={() => disconnect()}
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all active:scale-95 max-w-[140px] hover:opacity-70 font-orbitron ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-gray-900' : 'bg-white/10 border-white/20 text-white'}`}
       >
-        CONNECT
+        <span className="text-sm font-medium">
+          {address.slice(0, 4)}...{address.slice(-4)}
+        </span>
       </button>
     );
-  };
+  }
+
+  return (
+    <button
+      onClick={handleConnect}
+      className="px-4 py-2 rounded-2xl bg-[#0000ff] text-white text-sm font-bold uppercase tracking-wider active:scale-95 transition-transform font-orbitron"
+    >
+      CONNECT
+    </button>
+  );
+};
 
   return (
     <div 
