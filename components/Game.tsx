@@ -677,7 +677,7 @@ export default function Game() {
                   {isConfirmed && (
                     <button
                       onClick={handleShare}
-                      className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-green-600 text-white mb-3 shadow-lg shadow-green-600/30 active:scale-98 transition-transform"
+                      className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000dd] text-white mb-3 shadow-lg shadow-blue-600/30 active:scale-98 transition-transform"
                     >
                       SHARE ACHIEVEMENT
                     </button>
