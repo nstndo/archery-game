@@ -362,8 +362,10 @@ export default function Game() {
               setArrowsLeft(arrowsLeftRef.current);
 
               if (arrowsLeftRef.current <= 0) {
-                gameState.current = 'level_complete';
-                setTimeout(() => setIsLevelComplete(true), 50);
+                setTimeout(() => {
+                gameState.current = 'paused';
+                setIsLevelComplete(true);
+                }, 50);
               }
             }
           }
