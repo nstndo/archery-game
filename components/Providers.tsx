@@ -9,12 +9,11 @@ import { type ReactNode, useState } from 'react';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
-
   const [config] = useState(() =>
     createConfig({
       chains: [base],
       connectors: [
-        injected(), // Support for MetaMask and other injected wallets
+        injected(),
         coinbaseWallet({
           appName: 'Base Archery',
         }),
@@ -29,6 +28,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <OnchainKitProvider
+          apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
           chain={base}
         >
           {children}

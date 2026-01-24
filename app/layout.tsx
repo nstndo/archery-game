@@ -2,21 +2,22 @@ import type { Metadata } from "next";
 import { Orbitron, Roboto } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
+import { SafeArea } from "@coinbase/onchainkit/minikit";
 import '@coinbase/onchainkit/styles.css';
 
-const orbitron = Orbitron({ 
+const orbitron = Orbitron({
   subsets: ["latin"],
   weight: ["400", "500", "700", "900"],
   variable: "--font-orbitron",
 });
 
-const roboto = Roboto({ 
+const roboto = Roboto({
   subsets: ["latin"],
   weight: ["400", "700", "900"],
   variable: "--font-roboto",
 });
 
-const APP_URL = "https://base-archery-game.vercel.app";
+const APP_URL = process.env.NEXT_PUBLIC_URL || "https://base-archery-game.vercel.app";
 
 export const metadata: Metadata = {
   title: "Base Archery",
@@ -32,7 +33,7 @@ export const metadata: Metadata = {
     images: [`${APP_URL}/opengraph-image.png`],
   },
   other: {
-    "base:app_id": "696eb06ac0ab25addaaaf6af",
+    "base:app_id": "696eb06ac0ab25addaaaf6af", // ✅ Сохранен ваш app_id
     "fc:frame": JSON.stringify({
       version: "next",
       imageUrl: `${APP_URL}/opengraph-image.png`,
@@ -57,9 +58,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${orbitron.variable} ${roboto.variable} antialiased`}>
+      <body className={`${orbitron.variable} ${roboto.variable}`}>
         <Providers>
-          {children}
+          <SafeArea>
+            {children}
+          </SafeArea>
         </Providers>
       </body>
     </html>
