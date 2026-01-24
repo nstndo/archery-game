@@ -387,7 +387,7 @@ export default function Game() {
       if (containerRef.current) resizeObserver.unobserve(containerRef.current);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [level, currentTheme, context, address]);
+  }, [currentTheme, context, address]);
 
   const shoot = () => {
     if (gameState.current !== 'playing' || flyingArrow.current || arrowsLeftRef.current <= 0) return;
