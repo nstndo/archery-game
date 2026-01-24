@@ -32,7 +32,7 @@ export function Providers({ children }: { children: ReactNode }) {
           apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
           chain={base}
         >
-          <MiniKitProvider>
+          <MiniKitProvider chain={base}>
             {children}
           </MiniKitProvider>
         </OnchainKitProvider>
