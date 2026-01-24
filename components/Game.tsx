@@ -33,7 +33,7 @@ const CONTRACT_ABI = [
   }
 ] as const;
 
-const CONTRACT_ADDRESS = "0x01317cE9Ae33F5A626A9477F25aFA07d73887aC9";
+const CONTRACT_ADDRESS = "0x432F699F1D35fD49b8B1afc0eA9FAE62F45aDADB";
 
 interface Arrow {
   angle: number;
