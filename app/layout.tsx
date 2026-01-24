@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Orbitron, Roboto } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
+import '@coinbase/onchainkit/styles.css';
 
 const orbitron = Orbitron({ 
   subsets: ["latin"],
@@ -15,6 +16,8 @@ const roboto = Roboto({
   variable: "--font-roboto",
 });
 
+const APP_URL = "https://base-archery-game.vercel.app";
+
 export const metadata: Metadata = {
   title: "Base Archery",
   description: "Compete in the Base Archery Tournament. Mint your score as NFT on Base.",
@@ -26,20 +29,20 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Base Archery",
     description: "Compete in the Base Archery Tournament.",
-    images: [`https://base-archery-game.vercel.app/opengraph-image.png`],
+    images: [`${APP_URL}/opengraph-image.png`],
   },
   other: {
     "base:app_id": "696eb06ac0ab25addaaaf6af",
     "fc:frame": JSON.stringify({
       version: "next",
-      imageUrl: `https://base-archery-game.vercel.app/opengraph-image.png`,
+      imageUrl: `${APP_URL}/opengraph-image.png`,
       button: {
         title: "Play Archery",
         action: {
           type: "launch_frame",
           name: "Base Archery",
           url: APP_URL,
-          splashImageUrl: `https://base-archery-game.vercel.app/logo.png`,
+          splashImageUrl: `${APP_URL}/base-logo.png`,
           splashBackgroundColor: "#000010"
         }
       }
@@ -54,7 +57,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body className={`${orbitron.variable} ${roboto.variable}`}>
         <Providers>{children}</Providers>
       </body>
     </html>
