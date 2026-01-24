@@ -26,20 +26,20 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Base Archery",
     description: "Compete in the Base Archery Tournament.",
-    images: [`${APP_URL}/opengraph-image.png`],
+    images: [`https://base-archery-game.vercel.app/opengraph-image.png`],
   },
   other: {
     "base:app_id": "696eb06ac0ab25addaaaf6af",
     "fc:frame": JSON.stringify({
       version: "next",
-      imageUrl: `${APP_URL}/opengraph-image.png`,
+      imageUrl: `https://base-archery-game.vercel.app/opengraph-image.png`,
       button: {
         title: "Play Archery",
         action: {
           type: "launch_frame",
           name: "Base Archery",
-          url: APP_URL,
-          splashImageUrl: `${APP_URL}/logo.png`,
+          url: https://base-archery-game.vercel.app,
+          splashImageUrl: `https://base-archery-game.vercel.app/logo.png`,
           splashBackgroundColor: "#000010"
         }
       }
