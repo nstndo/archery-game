@@ -566,39 +566,36 @@ export default function Game() {
       />
 
       <div className="absolute inset-0 pointer-events-none flex flex-col" style={{ zIndex: 10 }}>
-        <div className="top-bar pointer-events-auto flex items-center justify-between px-4 py-3">
-          <h1 className={`text-lg font-black font-orbitron tracking-wider ${currentTheme === 'dark' ? 'text-white' : 'text-[#0000ff]'}`}>
-            BASE ARCHERY
-          </h1>
-          <button
-            onClick={toggleTheme}
-            className={`w-10 h-10 rounded-full flex items-center justify-center ${currentTheme === 'dark' ? 'bg-white/10 text-white' : 'bg-blue-100 text-blue-600'}`}
-          >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+        {/* Top Bar */}
+        <div className={`top-bar flex justify-between items-center px-4 py-4 pt-[calc(15px+env(safe-area-inset-top))] backdrop-blur-md border-b transition-colors duration-300 flex-shrink-0 pointer-events-auto ${currentTheme === 'light' ? 'bg-white/85 border-blue-600/10' : 'bg-[#000020]/85 border-white/10'}`}>
+          <div className="font-orbitron font-black text-lg flex items-center gap-2 uppercase tracking-wide flex-shrink-0">
+            BASE <span className="text-[#0000ff]">ARCHERY</span>
+          </div>
+          <div className="flex gap-2 items-center flex-shrink-0 min-w-0">
+            <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-500/10 transition-colors flex items-center justify-center">
               {currentTheme === 'dark' ? (
-                <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="white" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-sun"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
               ) : (
-                <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-moon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
               )}
-            </svg>
-          </button>
-          {renderProfile()}
+            </button>
+            {renderProfile()}
+          </div>
         </div>
 
+        {/* Stats Overlay */}
         <div className="game-stats pointer-events-auto flex items-center justify-between px-4 mt-2">
           <button
             onClick={() => openModal('leaderboard')}
             className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
           >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-award"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
           </button>
-          <div className="flex flex-col items-center">
+          <div className={`flex flex-col items-center justify-center px-6 py-2 rounded-2xl backdrop-blur-sm border ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200' : 'bg-black/50 border-white/10'}`}>
             <div className={`text-sm font-bold font-orbitron ${currentTheme === 'dark' ? 'text-white' : 'text-[#0000ff]'}`}>
               LEVEL {level}
             </div>
-            <div className={`text-xs font-roboto ${currentTheme === 'dark' ? 'text-white/70' : 'text-blue-700/70'}`}>
+            <div className={`text-xs font-roboto ${currentTheme === 'dark' ? 'text-white/70' : 'text-[#0000ff]/70'}`}>
               {arrowsLeft} ARROWS
             </div>
           </div>
@@ -606,9 +603,7 @@ export default function Game() {
             onClick={() => openModal('faq')}
             className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
           >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-help-circle"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </button>
         </div>
 
