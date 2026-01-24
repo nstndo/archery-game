@@ -415,7 +415,6 @@ export default function Game() {
       stuckArrows.current = [];
       flyingArrow.current = null;
       particles.current = [];
-      rotation.current = 0;
       gameState.current = 'playing';
     }, 100);
   };
