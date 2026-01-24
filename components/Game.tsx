@@ -498,34 +498,32 @@ export default function Game() {
   };
 
   const handleShare = () => {
-    const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`;
-    const embedUrl = 'https://base-archery-game.vercel.app';
+  const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`;
+  const embedUrl = 'https://base-archery-game.vercel.app';
 
-    if (isSDKLoaded && frameContext && sdk.actions.composeCast) {
-      try {
-        sdk.actions.composeCast({
-          text,
-          embeds: [embedUrl]
-        });
-        return;
-      } catch (e) {
-        console.warn("SDK composeCast failed", e);
-      }
+  if (isSDKLoaded && frameContext) {
+    try {
+      const shareIntent = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(embedUrl)}`;
+      sdk.actions.openUrl(shareIntent);
+      return;
+    } catch (e) {
+      console.warn("SDK openUrl failed", e);
     }
+  }
 
-    if (navigator.share) {
-      navigator.share({
-        title: 'Base Archery',
-        text: text,
-        url: embedUrl
-      }).catch((err) => console.log('Share cancelled', err));
-    } else {
-      const shareText = `${text}\n${embedUrl}`;
-      navigator.clipboard.writeText(shareText).then(() => {
-        alert('Link copied to clipboard!');
-      });
-    }
-  };
+  if (typeof navigator !== 'undefined' && navigator.share) {
+    navigator.share({
+      title: 'Base Archery',
+      text: text,
+      url: embedUrl
+    }).catch((err) => console.log('Share cancelled', err));
+  } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+    const shareText = `${text}\n${embedUrl}`;
+    navigator.clipboard.writeText(shareText).then(() => {
+      alert('Link copied to clipboard!');
+    });
+  }
+};
 
   const renderProfile = () => {
     if (frameContext?.user) {
