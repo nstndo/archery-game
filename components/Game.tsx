@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
 import { base } from 'viem/chains';
-import { useMiniKit, useComposeCast } from '@coinbase/onchainkit/minikit';
+import { useMiniKit } from '@coinbase/onchainkit/minikit';
+import sdk from '@farcaster/miniapp-sdk';
 
 const CONTRACT_ABI = [
   {
@@ -65,7 +66,6 @@ export default function Game() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { isFrameReady, setFrameReady, context } = useMiniKit();
-  const { composeCast } = useComposeCast();
 
   const { address, isConnected } = useAccount();
   const { connectors, connect } = useConnect();
@@ -493,15 +493,15 @@ export default function Game() {
     const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`;
     const embedUrl = 'https://base-archery-game.vercel.app';
 
-    if (isFrameReady && context) {
+    if (isFrameReady && context && sdk.actions?.composeCast) {
       try {
-        composeCast({
+        sdk.actions.composeCast({
           text,
           embeds: [embedUrl]
         });
         return;
       } catch (e) {
-        console.warn("MiniKit composeCast failed", e);
+        console.warn("SDK composeCast failed", e);
       }
     }
 
