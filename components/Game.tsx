@@ -517,7 +517,7 @@ export default function Game() {
               className="w-6 h-6 rounded-full"
             />
           )}
-          <span className="text-sm font-medium truncate">
+          <span className="text-sm font-medium truncate font-orbitron">
             {context.user.username}
           </span>
         </div>
@@ -528,7 +528,7 @@ export default function Game() {
       return (
         <button
           onClick={() => disconnect()}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border border-current transition-all active:scale-95 max-w-[140px] hover:opacity-70 ${currentTheme === 'light' ? 'border-gray-300' : 'border-white/20'}`}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border border-current transition-all active:scale-95 max-w-[140px] hover:opacity-70 font-orbitron ${currentTheme === 'light' ? 'border-gray-300' : 'border-white/20'}`}
         >
           <span className="text-sm font-medium">
             {address.slice(0, 4)}...{address.slice(-4)}
@@ -540,7 +540,7 @@ export default function Game() {
     return (
       <button
         onClick={handleConnect}
-        className="px-4 py-2 rounded-2xl bg-[#0000ff] text-white text-sm font-bold uppercase tracking-wider active:scale-95 transition-transform"
+        className="px-4 py-2 rounded-2xl bg-[#0000ff] text-white text-sm font-bold uppercase tracking-wider active:scale-95 transition-transform font-orbitron"
       >
         CONNECT
       </button>
@@ -584,26 +584,26 @@ export default function Game() {
         </div>
 
         {/* Stats Overlay */}
-        <div className="game-stats pointer-events-auto flex items-center justify-between px-4 mt-2">
+        <div className="game-stats pointer-events-auto flex items-center justify-center gap-3 px-4 mt-3">
           <button
             onClick={() => openModal('leaderboard')}
-            className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
+            className={`w-10 h-10 rounded-full flex justify-center items-center backdrop-blur-sm border active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-award"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-award"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
           </button>
           <div className={`flex flex-col items-center justify-center px-6 py-2 rounded-2xl backdrop-blur-sm border ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200' : 'bg-black/50 border-white/10'}`}>
             <div className={`text-sm font-bold font-orbitron ${currentTheme === 'dark' ? 'text-white' : 'text-[#0000ff]'}`}>
               LEVEL {level}
             </div>
-            <div className={`text-xs font-roboto ${currentTheme === 'dark' ? 'text-white/70' : 'text-[#0000ff]/70'}`}>
+            <div className={`text-xs font-orbitron ${currentTheme === 'dark' ? 'text-white/70' : 'text-[#0000ff]/70'}`}>
               {arrowsLeft} ARROWS
             </div>
           </div>
           <button
             onClick={() => openModal('faq')}
-            className={`w-11 h-11 rounded-full flex justify-center items-center backdrop-blur-sm border active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
+            className={`w-10 h-10 rounded-full flex justify-center items-center backdrop-blur-sm border active:scale-90 transition-transform ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200 text-blue-600' : 'bg-black/50 border-white/10 text-white'}`}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-help-circle"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-help-circle"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </button>
         </div>
 
@@ -612,7 +612,7 @@ export default function Game() {
             <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
               <h2 className="text-2xl font-black font-orbitron text-center mb-4">LEADERBOARD</h2>
               {isLoadingLeaderboard ? (
-                <div className="text-center py-8 font-roboto">LOADING...</div>
+                <div className="text-center py-8 font-orbitron">LOADING...</div>
               ) : leaderboardData.length > 0 ? (
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {leaderboardData.map((item, i) => (
@@ -623,13 +623,13 @@ export default function Game() {
                       <div className="flex items-center gap-3">
                         <span className="font-bold font-orbitron text-lg">#{i + 1}</span>
                         <div className="flex flex-col">
-                          <span className="font-medium font-roboto">
+                          <span className="font-medium font-orbitron">
                             {item.isCurrentUser && context?.user?.username
                               ? context.user.username
                               : `${item.address.slice(0, 6)}...${item.address.slice(-4)}`
                             }
                           </span>
-                          <span className="text-xs opacity-70 font-roboto">Token ID: {item.tokenId}</span>
+                          <span className="text-xs opacity-70 font-orbitron">Token ID: {item.tokenId}</span>
                         </div>
                       </div>
                       <div className="font-black font-orbitron text-xl">LVL {item.level}</div>
@@ -637,7 +637,7 @@ export default function Game() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 opacity-50 font-roboto">No champions yet.</div>
+                <div className="text-center py-8 opacity-50 font-orbitron">No champions yet.</div>
               )}
               <div className="flex gap-2 mt-4">
                 <button
@@ -661,9 +661,9 @@ export default function Game() {
               {isGameOver && (
                 <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
                   <h2 className="text-3xl font-black font-orbitron text-center mb-2">GAME OVER</h2>
-                  <p className="text-center mb-4 opacity-70 font-roboto">You hit another arrow!</p>
+                  <p className="text-center mb-4 opacity-70 font-orbitron">You hit another arrow!</p>
                   <div className="text-center mb-6">
-                    <div className="text-sm opacity-70 mb-1 font-roboto">Level Reached</div>
+                    <div className="text-sm opacity-70 mb-1 font-orbitron">LEVEL REACHED</div>
                     <div className="text-6xl font-black font-orbitron text-[#0000ff]">{level}</div>
                   </div>
                   {isConfirmed && (
@@ -676,16 +676,16 @@ export default function Game() {
                   )}
                   <button
                     onClick={handleMint}
-                    disabled={isPending || isConfirming}
+                    disabled={isPending || isConfirming || isConfirmed}
                     className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000ff] text-white mb-3 shadow-lg shadow-blue-600/30 active:scale-98 transition-transform disabled:opacity-50"
                   >
-                    {isPending ? 'Confirming...' : isConfirming ? 'Minting...' : isConfirmed ? 'Minted Successfully' : 'Mint Record NFT'}
+                    {isPending ? 'CONFIRMING...' : isConfirming ? 'MINTING...' : isConfirmed ? 'MINTED SUCCESSFULLY' : 'MINT RECORD NFT'}
                   </button>
                   <button
                     onClick={() => resetLevel(1)}
                     className={`w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}
                   >
-                    Try Again
+                    TRY AGAIN
                   </button>
                 </div>
               )}
@@ -693,12 +693,12 @@ export default function Game() {
               {isLevelComplete && (
                 <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
                   <h2 className="text-3xl font-black font-orbitron text-center mb-2">LEVEL COMPLETE!</h2>
-                  <p className="text-center mb-6 opacity-70 font-roboto">Great shot! Ready for the next challenge?</p>
+                  <p className="text-center mb-6 opacity-70 font-orbitron">Great shot! Ready for the next challenge?</p>
                   <button
                     onClick={() => resetLevel(level + 1)}
                     className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 active:scale-98 transition-transform"
                   >
-                    Next Level
+                    NEXT LEVEL
                   </button>
                 </div>
               )}
@@ -706,7 +706,7 @@ export default function Game() {
               {showFaq && (
                 <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
                   <h2 className="text-2xl font-black font-orbitron text-center mb-4">GAME RULES</h2>
-                  <div className="space-y-4 mb-6 font-roboto">
+                  <div className="space-y-4 mb-6 font-orbitron">
                     <div>
                       <h3 className="font-bold mb-1">HOW TO PLAY?</h3>
                       <p className="text-sm opacity-70">Tap anywhere to shoot. Fill the target without hitting other arrows.</p>
@@ -720,7 +720,7 @@ export default function Game() {
                     onClick={closeModal}
                     className="w-full p-4 rounded-xl font-bold font-orbitron bg-[#0000ff] text-white"
                   >
-                    Close
+                    CLOSE
                   </button>
                 </div>
               )}
