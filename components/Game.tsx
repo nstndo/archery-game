@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
 import { base } from 'viem/chains';
 import { useMiniKit } from '@coinbase/onchainkit/minikit';
-import sdk from '@farcaster/miniapp-sdk';
 
 const CONTRACT_ABI = [
   {
@@ -489,35 +488,38 @@ export default function Game() {
     });
   };
 
-  const handleShare = () => {
-    const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`;
-    const embedUrl = 'https://base-archery-game.vercel.app';
+  const handleShare = async () => {
+  const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score? Mint your record on Base.`;
+  const embedUrl = 'https://base-archery-game.vercel.app';
 
-    if (isFrameReady && context && sdk.actions?.composeCast) {
-      try {
+  if (isFrameReady && context) {
+    try {
+      const { default: sdk } = await import('@farcaster/miniapp-sdk');
+      if (sdk.actions?.composeCast) {
         sdk.actions.composeCast({
           text,
           embeds: [embedUrl]
         });
         return;
-      } catch (e) {
-        console.warn("SDK composeCast failed", e);
       }
+    } catch (e) {
+      console.warn("SDK composeCast failed", e);
     }
+  }
 
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      navigator.share({
-        title: 'Base Archery',
-        text: text,
-        url: embedUrl
-      }).catch((err) => console.log('Share cancelled', err));
-    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      const shareText = `${text}\n${embedUrl}`;
-      navigator.clipboard.writeText(shareText).then(() => {
-        alert('Link copied to clipboard!');
-      });
-    }
-  };
+  if (typeof navigator !== 'undefined' && navigator.share) {
+    navigator.share({
+      title: 'Base Archery',
+      text: text,
+      url: embedUrl
+    }).catch((err) => console.log('Share cancelled', err));
+  } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+    const shareText = `${text}\n${embedUrl}`;
+    navigator.clipboard.writeText(shareText).then(() => {
+      alert('Link copied to clipboard!');
+    });
+  }
+};
 
   const renderProfile = () => {
     if (context?.user) {
