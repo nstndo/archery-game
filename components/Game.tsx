@@ -56,6 +56,9 @@ interface LeaderboardEntry {
   level: number;
   tokenId: string;
   isCurrentUser: boolean;
+  username?: string;
+  displayName?: string;
+  pfpUrl?: string;
 }
 
 export default function Game() {
@@ -126,34 +129,91 @@ export default function Game() {
     assets.current.shardAse_Blue = loadImg('https://base-archery-game.vercel.app/ase-blue.webp');
   }, []);
 
+  const fetchUsersByAddresses = async (addresses: string[]) => {
+  const NEYNAR_API_KEY = process.env.NEXT_PUBLIC_NEYNAR_API_KEY;
+  
+  if (!NEYNAR_API_KEY || addresses.length === 0) return {};
+
+  try {
+    const addressesParam = addresses.join(',');
+    const response = await fetch(
+      `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${addressesParam}`,
+      {
+        method: 'GET',
+        headers: {
+          'accept': 'application/json',
+          'api_key': NEYNAR_API_KEY
+        }
+      }
+    );
+
+    if (!response.ok) {
+      console.error('Neynar API error:', response.status);
+      return {};
+    }
+
+    const data = await response.json();
+    
+    const userMap: Record<string, { username: string; displayName: string; pfpUrl: string }> = {};
+    
+    Object.entries(data).forEach(([address, users]: [string, any]) => {
+      if (users && users.length > 0) {
+        const user = users[0];
+        userMap[address.toLowerCase()] = {
+          username: user.username,
+          displayName: user.display_name || user.username,
+          pfpUrl: user.pfp_url
+        };
+      }
+    });
+    
+    return userMap;
+  } catch (e) {
+    console.error('Failed to fetch Farcaster users', e);
+    return {};
+  }
+};
+
   const fetchLeaderboard = async () => {
-    if (!publicClient) return;
+  if (!publicClient) return;
 
-    setIsLoadingLeaderboard(true);
-    setLeaderboardData([]);
+  setIsLoadingLeaderboard(true);
+  setLeaderboardData([]);
 
-    try {
-      const data = await publicClient.readContract({
-        address: CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
-        functionName: 'getLeaderboard',
-      }) as any[];
+  try {
+    const data = await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      functionName: 'getLeaderboard',
+    }) as any[];
 
-      const formatted: LeaderboardEntry[] = data.map((item) => ({
+    const addresses = data.map(item => item.wallet);
+    
+    const userMap = await fetchUsersByAddresses(addresses);
+
+    const formatted: LeaderboardEntry[] = data.map((item) => {
+      const addr = item.wallet.toLowerCase();
+      const userData = userMap[addr];
+      
+      return {
         address: item.wallet,
         level: Number(item.maxLevel),
         tokenId: item.tokenId.toString(),
-        isCurrentUser: address ? item.wallet.toLowerCase() === address.toLowerCase() : false
-      }));
+        isCurrentUser: address ? addr === address.toLowerCase() : false,
+        username: userData?.username,
+        displayName: userData?.displayName,
+        pfpUrl: userData?.pfpUrl
+      };
+    });
 
-      formatted.sort((a, b) => b.level - a.level);
-      setLeaderboardData(formatted);
-    } catch (e) {
-      console.error("Fetch leaderboard error", e);
-    } finally {
-      setIsLoadingLeaderboard(false);
-    }
-  };
+    formatted.sort((a, b) => b.level - a.level);
+    setLeaderboardData(formatted);
+  } catch (e) {
+    console.error("Fetch leaderboard error", e);
+  } finally {
+    setIsLoadingLeaderboard(false);
+  }
+};
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -634,18 +694,17 @@ export default function Game() {
                     >
                       <div className="flex items-center gap-3">
                         <span className="font-bold font-orbitron text-lg">#{i + 1}</span>
-                        <div className="flex flex-col">
-                          <span className="font-medium font-orbitron">
-                            {item.isCurrentUser && context?.user?.username
-                              ? context.user.username
-                              : `${item.address.slice(0, 6)}...${item.address.slice(-4)}`
-                            }
-                          </span>
-                          <span className="text-xs opacity-70 font-orbitron">Token ID: {item.tokenId}</span>
-                        </div>
+                            <div className="flex flex-col">
+                                <span className="font-medium font-orbitron">
+                                    {item.isCurrentUser && context?.user?.username
+                                    ? context.user.username
+                                    : item.displayName || item.username || `${item.address.slice(0, 6)}...${item.address.slice(-4)}`
+                                    }
+                                </span>
+                                <span className="text-xs opacity-70 font-orbitron">Token ID: {item.tokenId}</span>
+                            </div>
                       </div>
-                      <div className="font-black font-orbitron text-xl">LVL {item.level}</div>
-                    </div>
+
                   ))}
                 </div>
               ) : (
