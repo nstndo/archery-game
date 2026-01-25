@@ -87,6 +87,7 @@ export default function Game() {
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
   const [showWalletModal, setShowWalletModal] = useState(false);
+  const [shouldMint, setShouldMint] = useState(false);
 
   const gameState = useRef<'playing' | 'gameover' | 'level_complete' | 'paused'>('playing');
   const stuckArrows = useRef<Arrow[]>([]);
@@ -129,6 +130,19 @@ export default function Game() {
     assets.current.shardB_Blue = loadImg('https://base-archery-game.vercel.app/b-blue.webp');
     assets.current.shardAse_Blue = loadImg('https://base-archery-game.vercel.app/ase-blue.webp');
   }, []);
+
+  useEffect(() => {
+    if (shouldMint && chainId === base.id && isConnected) {
+      setShouldMint(false);
+      writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: 'mintScore',
+        args: [BigInt(level)],
+        chainId: base.id,
+      });
+    }
+  }, [chainId, shouldMint, isConnected, level, writeContract]);
 
   const fetchUsersByAddresses = async (addresses: string[]) => {
   const NEYNAR_API_KEY = process.env.NEXT_PUBLIC_NEYNAR_API_KEY;
@@ -495,16 +509,13 @@ export default function Game() {
       return;
     }
 
-    // Check if in Farcaster MiniApp context
     const isFarcasterMiniApp = context?.client?.clientFid;
 
     if (isFarcasterMiniApp) {
-      // Auto-connect using Farcaster MiniApp connector (first in array)
       const farcasterConnector = connectors.find((c) => c.id === 'farcaster');
       const connector = farcasterConnector || connectors[0];
       if (connector) connect({ connector });
     } else {
-      // For browser - show wallet selection modal
       setShowWalletModal(true);
     }
   };
@@ -538,29 +549,18 @@ export default function Game() {
       return;
     }
 
-    // Force switch to Base chain if not already on it
     if (chainId !== base.id) {
       try {
+        setShouldMint(true);
         await switchChain({ chainId: base.id });
-        // Wait a bit for chain switch to complete
-        setTimeout(() => {
-          writeContract({
-            address: CONTRACT_ADDRESS,
-            abi: CONTRACT_ABI,
-            functionName: 'mintScore',
-            args: [BigInt(level)],
-            chainId: base.id,
-          });
-        }, 500);
-        return;
       } catch (error) {
         console.error("Failed to switch to Base chain", error);
+        setShouldMint(false);
         alert("Please switch to Base network in your wallet");
-        return;
       }
+      return;
     }
 
-    // Already on Base, proceed with mint
     writeContract({
       address: CONTRACT_ADDRESS,
       abi: CONTRACT_ABI,
