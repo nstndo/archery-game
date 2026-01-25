@@ -549,9 +549,16 @@ export default function Game() {
     return;
   }
 
+  console.log('=== MINT DEBUG ===');
+  console.log('Current chainId:', chainId);
+  console.log('Base chainId:', base.id);
+  console.log('Are they equal?', chainId === base.id);
+  console.log('chainId type:', typeof chainId);
+  console.log('base.id type:', typeof base.id);
+
   if (chainId !== base.id) {
     try {
-      console.log('Current chain:', chainId, 'Switching to Base:', base.id);
+      console.log('Attempting to switch chain...');
       await switchChain({ chainId: base.id });
       console.log('Switch chain completed');
       setShouldMint(true);
@@ -570,6 +577,12 @@ export default function Game() {
   }
 
   console.log('Already on Base, minting...');
+  console.log('Calling writeContract with:', {
+    address: CONTRACT_ADDRESS,
+    chainId: base.id,
+    level: level
+  });
+  
   try {
     writeContract({
       address: CONTRACT_ADDRESS,
@@ -578,6 +591,7 @@ export default function Game() {
       args: [BigInt(level)],
       chainId: base.id,
     });
+    console.log('writeContract called successfully');
   } catch (error) {
     console.error("Write contract failed", error);
   }
