@@ -16,11 +16,7 @@ export function Providers({ children }: { children: ReactNode }) {
       connectors: [
         coinbaseWallet({
           appName: 'Base Archery',
-          preference: 'smartWalletOnly',
-        }),
-        coinbaseWallet({
-          appName: 'Base Archery',
-          preference: 'all',
+          preference: 'all', // Single connector for both Smart Wallet and regular wallet
         }),
         walletConnect({
           projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '0',
@@ -32,7 +28,7 @@ export function Providers({ children }: { children: ReactNode }) {
           },
           showQrModal: true,
         }),
-        injected(), //
+        injected(),
       ],
       transports: {
         [base.id]: http(),

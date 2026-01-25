@@ -495,16 +495,14 @@ export default function Game() {
       return;
     }
 
+    // Check if in Base App
     const isBaseApp = context?.client?.clientFid;
-    const isBrowser = typeof window !== 'undefined' && !context?.client;
 
-    if (isBaseApp) {
-      const coinbase = connectors.find((c) => c.id === 'coinbaseWalletSDK');
-      const connector = coinbase || connectors[0];
-      if (connector) connect({ connector });
-    } else if (isBrowser) {
+    if (!isBaseApp) {
+      // For browser and Farcaster - show wallet selection modal
       setShowWalletModal(true);
     } else {
+      // Auto-connect in Base App
       const coinbase = connectors.find((c) => c.id === 'coinbaseWalletSDK');
       const connector = coinbase || connectors[0];
       if (connector) connect({ connector });
