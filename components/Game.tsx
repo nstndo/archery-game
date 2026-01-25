@@ -544,58 +544,52 @@ export default function Game() {
   };
 
   const handleMint = async () => {
-  if (!isConnected) {
-    handleConnect();
-    return;
-  }
-
-  // Get actual chain ID from wallet, not from wagmi cache
-  let actualChainId = chainId;
-  
-  if (typeof window !== 'undefined' && window.ethereum) {
-    try {
-      const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
-      actualChainId = parseInt(chainIdHex, 16);
-      console.log('Actual chain from wallet:', actualChainId);
-      console.log('Wagmi cached chain:', chainId);
-    } catch (e) {
-      console.error('Failed to get chain from wallet', e);
+    if (!isConnected) {
+      handleConnect();
+      return;
     }
-  }
 
-  if (actualChainId !== base.id) {
-    try {
-      console.log('Switching from', actualChainId, 'to Base', base.id);
-      await switchChain({ chainId: base.id });
-      console.log('Switch chain completed');
-      setShouldMint(true);
-    } catch (error) {
-      console.error("Failed to switch to Base chain", error);
-      setShouldMint(false);
-      
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('rejected') || errorMessage.includes('denied')) {
-        alert("Chain switch was rejected. Please switch to Base network manually.");
-      } else {
-        alert("Please switch to Base network in your wallet");
+    let actualChainId = chainId;
+    
+    if (typeof window !== 'undefined' && window.ethereum) {
+      try {
+        const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+        actualChainId = parseInt(chainIdHex, 16);
+      } catch (e) {
+        console.error('Failed to get chain from wallet', e);
       }
     }
-    return;
-  }
 
-  console.log('Already on Base, minting...');
-  try {
-    writeContract({
-      address: CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
-      functionName: 'mintScore',
-      args: [BigInt(level)],
-      chainId: base.id,
-    });
-  } catch (error) {
-    console.error("Write contract failed", error);
-  }
-};
+    if (actualChainId !== base.id) {
+      try {
+        await switchChain({ chainId: base.id });
+        setShouldMint(true);
+      } catch (error) {
+        console.error("Failed to switch to Base chain", error);
+        setShouldMint(false);
+        
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('rejected') || errorMessage.includes('denied')) {
+          alert("Chain switch was rejected. Please switch to Base network manually.");
+        } else {
+          alert("Please switch to Base network in your wallet");
+        }
+      }
+      return;
+    }
+
+    try {
+      writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: 'mintScore',
+        args: [BigInt(level)],
+        chainId: base.id,
+      });
+    } catch (error) {
+      console.error("Write contract failed", error);
+    }
+  };
 
   const handleShare = async () => {
     const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score?`;
