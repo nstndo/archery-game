@@ -549,16 +549,23 @@ export default function Game() {
     return;
   }
 
-  console.log('=== MINT DEBUG ===');
-  console.log('Current chainId:', chainId);
-  console.log('Base chainId:', base.id);
-  console.log('Are they equal?', chainId === base.id);
-  console.log('chainId type:', typeof chainId);
-  console.log('base.id type:', typeof base.id);
-
-  if (chainId !== base.id) {
+  // Get actual chain ID from wallet, not from wagmi cache
+  let actualChainId = chainId;
+  
+  if (typeof window !== 'undefined' && window.ethereum) {
     try {
-      console.log('Attempting to switch chain...');
+      const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+      actualChainId = parseInt(chainIdHex, 16);
+      console.log('Actual chain from wallet:', actualChainId);
+      console.log('Wagmi cached chain:', chainId);
+    } catch (e) {
+      console.error('Failed to get chain from wallet', e);
+    }
+  }
+
+  if (actualChainId !== base.id) {
+    try {
+      console.log('Switching from', actualChainId, 'to Base', base.id);
       await switchChain({ chainId: base.id });
       console.log('Switch chain completed');
       setShouldMint(true);
@@ -577,12 +584,6 @@ export default function Game() {
   }
 
   console.log('Already on Base, minting...');
-  console.log('Calling writeContract with:', {
-    address: CONTRACT_ADDRESS,
-    chainId: base.id,
-    level: level
-  });
-  
   try {
     writeContract({
       address: CONTRACT_ADDRESS,
@@ -591,7 +592,6 @@ export default function Game() {
       args: [BigInt(level)],
       chainId: base.id,
     });
-    console.log('writeContract called successfully');
   } catch (error) {
     console.error("Write contract failed", error);
   }
