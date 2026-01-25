@@ -736,7 +736,7 @@ export default function Game() {
                 <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
                   <h2 className="text-3xl font-black font-orbitron text-center mb-2">GAME OVER</h2>
                   <p className="text-center mb-4 opacity-70 font-orbitron">You hit another arrow!</p>
-                  <div className="text-center mb-6 p-6 rounded-2xl border border-white/5">
+                  <div className="text-center mb-6 p-6 rounded-2xl border border-white/2">
                     <div className="text-sm opacity-70 mb-1 font-orbitron">LEVEL REACHED</div>
                     <div className="text-6xl font-black font-orbitron text-[#0000ff]">{level}</div>
                   </div>
