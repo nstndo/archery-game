@@ -495,17 +495,17 @@ export default function Game() {
       return;
     }
 
-    // Check if in Base App
-    const isBaseApp = context?.client?.clientFid;
+    // Check if in Farcaster MiniApp context
+    const isFarcasterMiniApp = context?.client?.clientFid;
 
-    if (!isBaseApp) {
-      // For browser and Farcaster - show wallet selection modal
-      setShowWalletModal(true);
-    } else {
-      // Auto-connect in Base App
-      const coinbase = connectors.find((c) => c.id === 'coinbaseWalletSDK');
-      const connector = coinbase || connectors[0];
+    if (isFarcasterMiniApp) {
+      // Auto-connect using Farcaster MiniApp connector (first in array)
+      const farcasterConnector = connectors.find((c) => c.id === 'farcaster');
+      const connector = farcasterConnector || connectors[0];
       if (connector) connect({ connector });
+    } else {
+      // For browser - show wallet selection modal
+      setShowWalletModal(true);
     }
   };
 
@@ -538,22 +538,35 @@ export default function Game() {
       return;
     }
 
+    // Force switch to Base chain if not already on it
     if (chainId !== base.id) {
       try {
         await switchChain({ chainId: base.id });
+        // Wait a bit for chain switch to complete
+        setTimeout(() => {
+          writeContract({
+            address: CONTRACT_ADDRESS,
+            abi: CONTRACT_ABI,
+            functionName: 'mintScore',
+            args: [BigInt(level)],
+            chainId: base.id,
+          });
+        }, 500);
         return;
       } catch (error) {
-        console.error("Failed to switch chain", error);
+        console.error("Failed to switch to Base chain", error);
+        alert("Please switch to Base network in your wallet");
         return;
       }
     }
 
+    // Already on Base, proceed with mint
     writeContract({
       address: CONTRACT_ADDRESS,
       abi: CONTRACT_ABI,
       functionName: 'mintScore',
       args: [BigInt(level)],
-      chain: base,
+      chainId: base.id,
     });
   };
 

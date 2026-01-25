@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { base } from 'viem/chains';
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { coinbaseWallet, walletConnect, injected } from 'wagmi/connectors';
+import { farcasterMiniApp } from '@farcaster/miniapp-wagmi-connector';
 import { type ReactNode, useState } from 'react';
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -14,6 +15,7 @@ export function Providers({ children }: { children: ReactNode }) {
     createConfig({
       chains: [base],
       connectors: [
+        farcasterMiniApp(), // First for Farcaster auto-connect
         coinbaseWallet({
           appName: 'Base Archery',
           preference: 'all', // Single connector for both Smart Wallet and regular wallet
