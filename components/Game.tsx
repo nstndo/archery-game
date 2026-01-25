@@ -544,22 +544,46 @@ export default function Game() {
   };
 
   const handleMint = async () => {
-    if (!isConnected) {
-      handleConnect();
-      return;
-    }
+  if (!isConnected) {
+    handleConnect();
+    return;
+  }
 
-    if (chainId !== base.id) {
-      try {
-        setShouldMint(true);
-        await switchChain({ chainId: base.id });
-      } catch (error) {
-        console.error("Failed to switch to Base chain", error);
-        setShouldMint(false);
+  // Force switch to Base chain if not already on it
+  if (chainId !== base.id) {
+    try {
+      console.log('Current chain:', chainId, 'Switching to Base:', base.id);
+      await switchChain({ chainId: base.id });
+      console.log('Switch chain completed');
+      setShouldMint(true);
+    } catch (error) {
+      console.error("Failed to switch to Base chain", error);
+      setShouldMint(false);
+      
+      // Show user-friendly error
+      if (error?.message?.includes('rejected') || error?.message?.includes('denied')) {
+        alert("Chain switch was rejected. Please switch to Base network manually.");
+      } else {
         alert("Please switch to Base network in your wallet");
       }
-      return;
     }
+    return;
+  }
+
+  // Already on Base, proceed with mint immediately
+  console.log('Already on Base, minting...');
+  try {
+    writeContract({
+      address: CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      functionName: 'mintScore',
+      args: [BigInt(level)],
+      chainId: base.id,
+    });
+  } catch (error) {
+    console.error("Write contract failed", error);
+  }
+};
 
     writeContract({
       address: CONTRACT_ADDRESS,
