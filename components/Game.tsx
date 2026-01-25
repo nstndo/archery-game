@@ -585,15 +585,6 @@ export default function Game() {
   }
 };
 
-    writeContract({
-      address: CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
-      functionName: 'mintScore',
-      args: [BigInt(level)],
-      chainId: base.id,
-    });
-  };
-
   const handleShare = async () => {
     const text = `I just reached Level ${level} in Base Archery! 🎯\n\nCan you beat my score?`;
     const url = 'https://base-archery-game.vercel.app';
