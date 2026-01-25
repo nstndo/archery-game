@@ -664,10 +664,10 @@ export default function Game() {
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
           </button>
           <div className={`flex flex-col items-center justify-center px-6 py-2 rounded-2xl backdrop-blur-sm border min-w-[140px] ${currentTheme === 'light' ? 'bg-blue-100/50 border-blue-200' : 'bg-black/50 border-white/10'}`}>
-            <div className={`text-sm font-bold font-orbitron ${currentTheme === 'dark' ? 'text-white' : 'text-[#0000ff]'}`}>
+            <div className={`text-sm font-bold font-orbitron ${currentTheme === 'dark' ? 'text-white' : 'text-[#000000]'}`}>
               LEVEL {level}
             </div>
-            <div className={`text-xs font-orbitron ${currentTheme === 'dark' ? 'text-white/70' : 'text-[#0000ff]/70'}`}>
+            <div className={`text-xs font-bold font-orbitron ${currentTheme === 'dark' ? 'text-white/70' : 'text-[#0000ff]/70'}`}>
               {arrowsLeft} ARROWS
             </div>
           </div>
@@ -736,7 +736,7 @@ export default function Game() {
                 <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
                   <h2 className="text-3xl font-black font-orbitron text-center mb-2">GAME OVER</h2>
                   <p className="text-center mb-4 opacity-70 font-orbitron">You hit another arrow!</p>
-                  <div className="text-center mb-6">
+                  <div className="text-center mb-6 p-6 rounded-2xl border border-white/5">
                     <div className="text-sm opacity-70 mb-1 font-orbitron">LEVEL REACHED</div>
                     <div className="text-6xl font-black font-orbitron text-[#0000ff]">{level}</div>
                   </div>
