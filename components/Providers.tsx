@@ -5,7 +5,7 @@ import { MiniKitProvider } from '@coinbase/onchainkit/minikit';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { base } from 'viem/chains';
 import { WagmiProvider, createConfig, http } from 'wagmi';
-import { coinbaseWallet } from 'wagmi/connectors';
+import { coinbaseWallet, walletConnect, injected } from 'wagmi/connectors';
 import { type ReactNode, useState } from 'react';
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -18,6 +18,21 @@ export function Providers({ children }: { children: ReactNode }) {
           appName: 'Base Archery',
           preference: 'smartWalletOnly',
         }),
+        coinbaseWallet({
+          appName: 'Base Archery',
+          preference: 'all',
+        }),
+        walletConnect({
+          projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '0',
+          metadata: {
+            name: 'Base Archery',
+            description: 'Become a Base Legend',
+            url: 'https://base-archery-game.vercel.app',
+            icons: ['https://base-archery-game.vercel.app/logo.png'],
+          },
+          showQrModal: true,
+        }),
+        injected(), //
       ],
       transports: {
         [base.id]: http(),
