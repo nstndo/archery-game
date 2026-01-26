@@ -140,7 +140,6 @@ export default function Game() {
         functionName: 'mintScore',
         args: [BigInt(level)],
         chainId: base.id,
-        dataSuffix: DATA_SUFFIX,
       });
     }
   }, [chainId, shouldMint, isConnected, level, writeContract]);
@@ -586,7 +585,6 @@ export default function Game() {
         functionName: 'mintScore',
         args: [BigInt(level)],
         chainId: base.id,
-        dataSuffix: DATA_SUFFIX,
       });
     } catch (error) {
       console.error("Write contract failed", error);
