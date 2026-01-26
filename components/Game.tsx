@@ -732,157 +732,162 @@ export default function Game() {
           </button>
         </div>
 
-        <div className="flex-1 pointer-events-auto flex items-center justify-center p-4">
-          {showWalletModal && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
-                <h2 className="text-2xl font-black font-orbitron text-center mb-4">CONNECT WALLET</h2>
-                <div className="space-y-3">
-                  {connectors
-                    .filter(c => ['coinbaseWalletSDK', 'walletConnect', 'injected'].includes(c.id))
-                    .map((connector) => (
-                      <button
-                        key={connector.id}
-                        onClick={() => connectWithWallet(connector.id)}
-                        className={`w-full p-4 rounded-xl font-bold font-orbitron transition-all ${
-                          currentTheme === 'dark' ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'
-                        }`}
-                      >
-                        {connector.name}
-                      </button>
-                    ))}
-                </div>
-                <button
-                  onClick={() => setShowWalletModal(false)}
-                  className="w-full mt-4 p-3 rounded-xl font-bold font-orbitron bg-[#0000ff] text-white"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {showLeaderboard && (
-            <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
-              <h2 className="text-2xl font-black font-orbitron text-center mb-4">LEADERBOARD</h2>
-              {isLoadingLeaderboard ? (
-                <div className="text-center py-8 font-orbitron">LOADING...</div>
-              ) : leaderboardData.length > 0 ? (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {leaderboardData.map((item, i) => (
-                        <div
-                        key={i}
-                        className={`flex items-center justify-between p-3 rounded-xl ${item.isCurrentUser ? 'bg-blue-500/20 border-2 border-blue-500' : currentTheme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}
-                        >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <span className="font-bold font-orbitron text-lg w-12 flex-shrink-0">#{i + 1}</span>
-                        <div className="flex flex-col min-w-0 flex-1">
-                            <span className="font-medium font-orbitron truncate">
-                                {item.isCurrentUser && context?.user?.username
-                                ? context.user.username
-                                : item.displayName || item.username || `${item.address.slice(0, 6)}...${item.address.slice(-4)}`
-                                }
-                            </span>
-                            <span className="text-xs opacity-70 font-orbitron">Token ID: {item.tokenId}</span>
-                        </div>
-                        </div>
-                        <div className="font-black font-orbitron text-base flex-shrink-0 ml-2">
-                        <span className="text-sm opacity-70">LVL</span> {item.level}
-                        </div>
-                        </div>
-                    ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 opacity-50 font-orbitron">No champions yet.</div>
-              )}
-              <div className="flex gap-2 mt-4">
-                <button
-                  onClick={fetchLeaderboard}
-                  className={`flex-1 p-3 rounded-xl font-bold font-orbitron ${currentTheme === 'dark' ? 'bg-white/10' : 'bg-gray-200'}`}
-                >
-                  Refresh
-                </button>
-                <button
-                  onClick={closeModal}
-                  className="flex-1 p-3 rounded-xl font-bold font-orbitron bg-[#0000ff] text-white"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          )}
-
-          {!showLeaderboard && (
-            <>
-              {isGameOver && (
-                <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
-                  <h2 className="text-3xl font-black font-orbitron text-center mb-2">GAME OVER</h2>
-                  <p className="text-center mb-4 opacity-70 font-orbitron">You hit another arrow!</p>
-                  <div className="text-center mb-6 p-6 rounded-2xl border border-white/2">
-                    <div className="text-sm opacity-70 mb-1 font-orbitron">LEVEL REACHED</div>
-                    <div className="text-6xl font-black font-orbitron text-[#0000ff]">{level}</div>
-                  </div>
-                  {isConfirmed && (
-                    <button
-                      onClick={handleShare}
-                      className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000dd] text-white mb-3 shadow-lg shadow-blue-600/30 active:scale-98 transition-transform"
-                    >
-                      SHARE ACHIEVEMENT
-                    </button>
-                  )}
-                  <button
-                    onClick={handleMint}
-                    disabled={isPending || isConfirming || isConfirmed}
-                    className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000ff] text-white mb-3 shadow-lg shadow-blue-600/30 active:scale-98 transition-transform disabled:opacity-50"
-                  >
-                    {isPending ? 'CONFIRMING...' : isConfirming ? 'MINTING...' : isConfirmed ? 'MINTED SUCCESSFULLY' : 'MINT RECORD NFT'}
-                  </button>
-                  <button
-                    onClick={() => resetLevel(1)}
-                    className={`w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}
-                  >
-                    TRY AGAIN
-                  </button>
-                </div>
-              )}
-
-              {isLevelComplete && (
-                <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
-                  <h2 className="text-3xl font-black font-orbitron text-center mb-2">LEVEL COMPLETE!</h2>
-                  <p className="text-center mb-6 opacity-70 font-orbitron">Great shot! Ready for the next challenge?</p>
-                  <button
-                    onClick={() => resetLevel(level + 1)}
-                    className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 active:scale-98 transition-transform"
-                  >
-                    NEXT LEVEL
-                  </button>
-                </div>
-              )}
-
-              {showFaq && (
-                <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
-                  <h2 className="text-2xl font-black font-orbitron text-center mb-4">GAME RULES</h2>
-                  <div className="space-y-4 mb-6 font-orbitron">
-                    <div>
-                      <h3 className="font-bold mb-1">HOW TO PLAY?</h3>
-                      <p className="text-sm opacity-70">Tap anywhere to shoot. Fill the target without hitting other arrows.</p>
-                    </div>
-                    <div>
-                      <h3 className="font-bold mb-1">WHAT ARE NFTS?</h3>
-                      <p className="text-sm opacity-70">Your high score can be minted as a unique NFT on the Base blockchain.</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={closeModal}
-                    className="w-full p-4 rounded-xl font-bold font-orbitron bg-[#0000ff] text-white"
-                  >
-                    CLOSE
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+<div className="flex-1 pointer-events-auto flex items-center justify-center p-4">
+  {showWalletModal && (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
+        <h2 className="text-2xl font-black font-orbitron text-center mb-4">CONNECT WALLET</h2>
+        <div className="space-y-3">
+          {connectors
+            .filter(c => ['coinbaseWalletSDK', 'walletConnect', 'injected'].includes(c.id))
+            .map((connector) => (
+              <button
+                key={connector.id}
+                onClick={() => connectWithWallet(connector.id)}
+                className={`w-full p-4 rounded-xl font-bold font-orbitron transition-all ${
+                  currentTheme === 'dark' ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                {connector.name}
+              </button>
+            ))}
         </div>
+        <button
+          onClick={() => setShowWalletModal(false)}
+          className="w-full mt-4 p-3 rounded-xl font-bold font-orbitron bg-[#0000ff] text-white"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  )}
+
+  {!showLeaderboard && !showFaq && (
+    <>
+      {isGameOver && (
+        <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
+          <h2 className="text-3xl font-black font-orbitron text-center mb-2">GAME OVER</h2>
+          <p className="text-center mb-4 opacity-70 font-orbitron">You hit another arrow!</p>
+          <div className="text-center mb-6 p-6 rounded-2xl border border-white/2">
+            <div className="text-sm opacity-70 mb-1 font-orbitron">LEVEL REACHED</div>
+            <div className="text-6xl font-black font-orbitron text-[#0000ff]">{level}</div>
+          </div>
+          {isConfirmed && (
+            <button
+              onClick={handleShare}
+              className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000dd] text-white mb-3 shadow-lg shadow-blue-600/30 active:scale-98 transition-transform"
+            >
+              SHARE ACHIEVEMENT
+            </button>
+          )}
+          <button
+            onClick={handleMint}
+            disabled={isPending || isConfirming || isConfirmed}
+            className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000ff] text-white mb-3 shadow-lg shadow-blue-600/30 active:scale-98 transition-transform disabled:opacity-50"
+          >
+            {isPending ? 'CONFIRMING...' : isConfirming ? 'MINTING...' : isConfirmed ? 'MINTED SUCCESSFULLY' : 'MINT RECORD NFT'}
+          </button>
+          <button
+            onClick={() => resetLevel(1)}
+            className={`w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}
+          >
+            TRY AGAIN
+          </button>
+        </div>
+      )}
+
+      {isLevelComplete && (
+        <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
+          <h2 className="text-3xl font-black font-orbitron text-center mb-2">LEVEL COMPLETE!</h2>
+          <p className="text-center mb-6 opacity-70 font-orbitron">Great shot! Ready for the next challenge?</p>
+          <button
+            onClick={() => resetLevel(level + 1)}
+            className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 active:scale-98 transition-transform"
+          >
+            NEXT LEVEL
+          </button>
+        </div>
+      )}
+    </>
+  )}
+</div>
+
+{/* Separate layer for FAQ and Leaderboard - always on top */}
+{showFaq && (
+  <div className="fixed inset-0 flex items-center justify-center p-4 pointer-events-auto" style={{ zIndex: 20 }}>
+    <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
+      <h2 className="text-2xl font-black font-orbitron text-center mb-4">GAME RULES</h2>
+      <div className="space-y-4 mb-6 font-orbitron">
+        <div>
+          <h3 className="font-bold mb-1">HOW TO PLAY?</h3>
+          <p className="text-sm opacity-70">Tap anywhere to shoot. Fill the target without hitting other arrows.</p>
+        </div>
+        <div>
+          <h3 className="font-bold mb-1">WHAT ARE NFTS?</h3>
+          <p className="text-sm opacity-70">Your high score can be minted as a unique NFT on the Base blockchain.</p>
+        </div>
+      </div>
+      <button
+        onClick={closeModal}
+        className="w-full p-4 rounded-xl font-bold font-orbitron bg-[#0000ff] text-white"
+      >
+        CLOSE
+      </button>
+    </div>
+  </div>
+)}
+
+{showLeaderboard && (
+  <div className="fixed inset-0 flex items-center justify-center p-4 pointer-events-auto" style={{ zIndex: 20 }}>
+    <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
+      <h2 className="text-2xl font-black font-orbitron text-center mb-4">LEADERBOARD</h2>
+      {isLoadingLeaderboard ? (
+        <div className="text-center py-8 font-orbitron">LOADING...</div>
+      ) : leaderboardData.length > 0 ? (
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+            {leaderboardData.map((item, i) => (
+                <div
+                key={i}
+                className={`flex items-center justify-between p-3 rounded-xl ${item.isCurrentUser ? 'bg-blue-500/20 border-2 border-blue-500' : currentTheme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}
+                >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                <span className="font-bold font-orbitron text-lg w-12 flex-shrink-0">#{i + 1}</span>
+                <div className="flex flex-col min-w-0 flex-1">
+                    <span className="font-medium font-orbitron truncate">
+                        {item.isCurrentUser && context?.user?.username
+                        ? context.user.username
+                        : item.displayName || item.username || `${item.address.slice(0, 6)}...${item.address.slice(-4)}`
+                        }
+                    </span>
+                    <span className="text-xs opacity-70 font-orbitron">Token ID: {item.tokenId}</span>
+                </div>
+                </div>
+                <div className="font-black font-orbitron text-base flex-shrink-0 ml-2">
+                <span className="text-sm opacity-70">LVL</span> {item.level}
+                </div>
+                </div>
+            ))}
+        </div>
+      ) : (
+        <div className="text-center py-8 opacity-50 font-orbitron">No champions yet.</div>
+      )}
+      <div className="flex gap-2 mt-4">
+        <button
+          onClick={fetchLeaderboard}
+          className={`flex-1 p-3 rounded-xl font-bold font-orbitron ${currentTheme === 'dark' ? 'bg-white/10' : 'bg-gray-200'}`}
+        >
+          Refresh
+        </button>
+        <button
+          onClick={closeModal}
+          className="flex-1 p-3 rounded-xl font-bold font-orbitron bg-[#0000ff] text-white"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       </div>
     </div>
   );
