@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
 import { base } from 'viem/chains';
 import { useMiniKit } from '@coinbase/onchainkit/minikit';
-import { Attribution } from 'ox/erc8021';
+import { Erc8021 } from 'ox';
 
 const CONTRACT_ABI = [
   {
@@ -38,7 +38,7 @@ const CONTRACT_ADDRESS = "0x432F699F1D35fD49b8B1afc0eA9FAE62F45aDADB";
 
 const BUILDER_CODE = 'bc_lm1dh28q';
 
-const DATA_SUFFIX = Attribution.toDataSuffix({
+const DATA_SUFFIX = Erc8021.toDataSuffix({
   codes: [BUILDER_CODE]
 });
 
