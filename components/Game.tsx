@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
 import { base } from 'viem/chains';
 import { useMiniKit } from '@coinbase/onchainkit/minikit';
-import { encodeAbiParameters, parseAbiParameters } from 'viem';
 
 const CONTRACT_ABI = [
   {
@@ -35,14 +34,6 @@ const CONTRACT_ABI = [
 ] as const;
 
 const CONTRACT_ADDRESS = "0x432F699F1D35fD49b8B1afc0eA9FAE62F45aDADB";
-
-const DATA_SUFFIX = encodeAbiParameters(
-  parseAbiParameters('bytes4, string[]'),
-  [
-    '0x8021', // ERC-8021 magic bytes
-    ['bc_lm1dh28q']
-  ]
-);
 
 interface Arrow {
   angle: number;
@@ -149,7 +140,6 @@ export default function Game() {
         functionName: 'mintScore',
         args: [BigInt(level)],
         chainId: base.id,
-        dataSuffix: DATA_SUFFIX,
       });
     }
   }, [chainId, shouldMint, isConnected, level, writeContract]);
