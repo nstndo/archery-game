@@ -824,7 +824,7 @@ export default function Game() {
         </div>
         <div>
           <h3 className="font-bold mb-1">WHAT ARE NFTS?</h3>
-          <p className="text-sm opacity-70">Your high score can be minted as a unique NFT on the Base blockchain.</p>
+          <p className="text-sm opacity-70">Your high score can be minted as a unique NFT on the Base blockchain. Free. Just gas fee.</p>
         </div>
       </div>
       <button
