@@ -780,37 +780,40 @@ export default function Game() {
 
   {!showLeaderboard && !showFaq && (
     <>
-      {isGameOver && (
-        <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
-          <h2 className="text-3xl font-black font-orbitron text-center mb-2">GAME OVER</h2>
-          <p className="text-center mb-4 opacity-70 font-orbitron">You hit another arrow!</p>
-          <div className="text-center mb-6 p-6 rounded-2xl border border-white/2">
-            <div className="text-sm opacity-70 mb-1 font-orbitron">LEVEL REACHED</div>
-            <div className="text-6xl font-black font-orbitron text-[#0000ff]">{level}</div>
-          </div>
-          {isConfirmed && (
-            <button
-              onClick={handleShare}
-              className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000dd] text-white mb-3 shadow-lg shadow-blue-600/30 active:scale-98 transition-transform"
-            >
-              SHARE ACHIEVEMENT
-            </button>
-          )}
-          <button
-            onClick={handleMint}
-            disabled={isPending || isConfirming || isConfirmed}
-            className="w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000ff] text-white mb-3 shadow-lg shadow-blue-600/30 active:scale-98 transition-transform disabled:opacity-50"
-          >
-            {isPending ? 'CONFIRMING...' : isConfirming ? 'MINTING...' : isConfirmed ? 'MINTED SUCCESSFULLY' : 'MINT RECORD NFT'}
-          </button>
-          <button
-            onClick={() => resetLevel(1)}
-            className={`w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}
-          >
-            TRY AGAIN
-          </button>
-        </div>
-      )}
+{isGameOver && (
+  <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
+    <h2 className="text-3xl font-black font-orbitron text-center mb-2">GAME OVER</h2>
+    <p className="text-center mb-4 opacity-70 font-orbitron">You hit another arrow!</p>
+    <div className="text-center mb-6 p-6 rounded-2xl border border-white/2">
+      <div className="text-sm opacity-70 mb-1 font-orbitron">LEVEL REACHED</div>
+      <div className="text-6xl font-black font-orbitron text-[#0000ff]">{level}</div>
+    </div>
+    
+    <div className="flex gap-3 mb-3">
+      <button
+        onClick={handleMint}
+        disabled={isPending || isConfirming || isConfirmed}
+        className="flex-1 p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000ff] text-white shadow-lg shadow-blue-600/30 active:scale-98 transition-transform disabled:opacity-50"
+      >
+        {isPending ? 'CONFIRMING...' : isConfirming ? 'MINTING...' : isConfirmed ? 'MINTED!' : 'MINT NFT'}
+      </button>
+      
+      <button
+        onClick={handleShare}
+        className="flex-1 p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest bg-[#0000dd] text-white shadow-lg shadow-blue-600/30 active:scale-98 transition-transform"
+      >
+        SHARE
+      </button>
+    </div>
+    
+    <button
+      onClick={() => resetLevel(1)}
+      className={`w-full p-4 rounded-2xl font-bold font-orbitron text-base uppercase tracking-widest border active:scale-98 transition-transform ${currentTheme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-white/5 text-gray-400 border-white/10'}`}
+    >
+      TRY AGAIN
+    </button>
+  </div>
+)}
 
       {isLevelComplete && (
         <div className={`modal-card w-full max-w-md p-6 rounded-3xl shadow-2xl ${currentTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
