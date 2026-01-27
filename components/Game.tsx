@@ -5,6 +5,20 @@ import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTran
 import { base } from 'viem/chains';
 import { useMiniKit } from '@coinbase/onchainkit/minikit';
 
+const BUILDER_CODE = 'bc_lm1dh28q';
+
+function createDataSuffix(code: string): `0x${string}` {
+  const cleanCode = code.replace('bc_', '');
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(cleanCode);
+  const hex = Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `0x${hex}` as `0x${string}`;
+}
+
+const DATA_SUFFIX = createDataSuffix(BUILDER_CODE);
+
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "level", type: "uint256" }],
@@ -140,6 +154,7 @@ export default function Game() {
         functionName: 'mintScore',
         args: [BigInt(level)],
         chainId: base.id,
+        dataSuffix: DATA_SUFFIX,
       });
     }
   }, [chainId, shouldMint, isConnected, level, writeContract]);
@@ -585,6 +600,7 @@ export default function Game() {
         functionName: 'mintScore',
         args: [BigInt(level)],
         chainId: base.id,
+        dataSuffix: DATA_SUFFIX,
       });
     } catch (error) {
       console.error("Write contract failed", error);
