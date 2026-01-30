@@ -21,9 +21,6 @@ const APP_URL = "https://base-archery-game.vercel.app";
 export const metadata: Metadata = {
   title: "Base Archery",
   description: "Compete in the Base Archery Tournament. Mint your score as NFT on Base.",
-  other: {
-    'base:app_id': '696eb06ac0ab25addaaaf6af'
-  },
   icons: {
     icon: 'https://base-archery-game.vercel.app/favicon.svg',
     shortcut: 'https://base-archery-game.vercel.app/favicon.svg',
@@ -60,6 +57,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <meta name="base:app_id" content="696eb06ac0ab25addaaaf6af" />
+      </head>
       <body className={`${orbitron.variable} ${roboto.variable}`}>
         <Providers>{children}</Providers>
       </body>
