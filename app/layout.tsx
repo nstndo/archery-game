@@ -59,6 +59,7 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta name="base:app_id" content="696eb06ac0ab25addaaaf6af" />
+        <meta name="talentapp:project_verification" content="89aaf763ff8c644a8ad4e836a3aa613d42ac1acaeb734d549825dfaca0addfcf5fb9ce974fb2d356251ebe044630a35f69c02d85b4e0a1b4c339fcaed140caf2">
       </head>
       <body className={`${orbitron.variable} ${roboto.variable}`}>
         <Providers>{children}</Providers>
